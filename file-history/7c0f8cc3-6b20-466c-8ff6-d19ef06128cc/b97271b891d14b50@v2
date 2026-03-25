@@ -1,0 +1,10 @@
+import { ipcMain } from 'electron'
+import { IPC } from '@shared/ipc-channels'
+import { getDb } from '../db'
+import * as db from '../db/workSessions'
+
+export function registerWorkTimerHandlers(): void {
+  ipcMain.handle(IPC.WORK_TIMER.START, () => db.startSession(getDb()))
+  ipcMain.handle(IPC.WORK_TIMER.STOP, (_e, { id }: { id: number }) => db.endSession(getDb(), id))
+  ipcMain.handle(IPC.WORK_TIMER.GET_TODAY_TOTAL, () => db.getTodayTotal(getDb()))
+}

@@ -1,0 +1,199 @@
+# ADHD To-Do Desktop App — Implementation Plan
+
+## Context
+Build a brand-new Electron desktop to-do app for a user with ADHD. The app must be dark-mode only, persist data via SQLite, live in the system tray, and include ADHD-friendly features: large live clock, "DO BEFORE 5PM" countdown, focus mode, Pomodoro timer (4×25/5 + 30min break), brain dump quick-add, subtasks with time estimates, drag-to-reorder, color coding, and recurring tasks. A gamification research agent is running in the background; its findings will be implemented in a follow-up session.
+
+## Tech Stack
+- **Electron** + **electron-vite** (scaffolded via `npm create @quick-start/electron`)
+- **React 18** + **TypeScript** (renderer)
+- **Tailwind CSS** + **shadcn/ui** (dark UI components)
+- **better-sqlite3** (SQLite; native addon, requires `electron-rebuild`)
+- **@dnd-kit** (drag-and-drop)
+- **date-fns** (date math in both processes)
+- **Zustand** (ephemeral UI state only — not persisted task data)
+
+## File Structure
+```
+adhd-todo/
+├── electron.vite.config.ts
+├── package.json / tsconfig*.json / tailwind.config.ts
+├── resources/icon.ico
+└── src/
+    ├── main/
+    │   ├── index.ts          # BrowserWindow, tray, app lifecycle
+    │   ├── tray.ts           # SystemTray + context menu
+    │   ├── window.ts         # Window helpers
+    │   ├── ipc/
+    │   │   ├── index.ts      # Registers all handlers
+    │   │   ├── tasks.ts      # CRUD + reorder + complete (handles recurrence)
+    │   │   ├── categories.ts
+    │   │   ├── subtasks.ts
+    │   │   └── pomodoro.ts   # Session start/complete logging
+    │   └── db/
+    │       ├── index.ts      # Open DB + run migrations
+    │       ├── migrations.ts # All CREATE TABLE statements
+    │       ├── tasks.ts / categories.ts / subtasks.ts / pomodoro.ts
+    ├── preload/
+    │   └── index.ts          # contextBridge whitelist of ipcRenderer.invoke
+    ├── renderer/
+    │   ├── main.tsx / App.tsx / globals.css
+    │   ├── components/
+    │   │   ├── layout/       AppShell, Header, Sidebar
+    │   │   ├── clock/        LiveClock
+    │   │   ├── banner/       Before5pmBanner
+    │   │   ├── tasks/        TaskList, TaskCard, TaskForm, SubtaskList, RecurringBadge
+    │   │   ├── categories/   CategoryItem, CategoryForm
+    │   │   ├── braindump/    BrainDumpInput (FAB + Ctrl+Space shortcut)
+    │   │   ├── focus/        FocusMode, PomodoroTimer
+    │   │   └── gamification/ GamificationStub (empty placeholder)
+    │   ├── hooks/            useTasks, useCategories, useSubtasks, useLiveClock,
+    │   │                     useBefore5pm, usePomodoro, useDragOrder
+    │   ├── store/            appStore.ts (Zustand: activeCategory, focusMode,
+    │   │                     focusTaskId, brainDumpOpen)
+    │   └── lib/              ipc.ts (typed wrappers), utils.ts
+    └── shared/
+        ├── types.ts          # Task, Category, Subtask, PomodoroSession interfaces
+        └── ipc-channels.ts   # Channel name constants
+```
+
+## SQLite Schema (src/main/db/migrations.ts)
+```sql
+PRAGMA journal_mode = WAL;
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE IF NOT EXISTS categories (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  color TEXT NOT NULL DEFAULT '#6366f1',
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+INSERT OR IGNORE INTO categories (name, color) VALUES ('Inbox', '#6366f1');
+
+CREATE TABLE IF NOT EXISTS tasks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+  title TEXT NOT NULL,
+  color TEXT,
+  due_date TEXT,
+  due_before_5pm INTEGER NOT NULL DEFAULT 0,
+  time_estimate_mins INTEGER,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  is_complete INTEGER NOT NULL DEFAULT 0,
+  completed_at TEXT,
+  recurring_pattern TEXT,       -- 'none'|'daily'|'weekly'|'monthly'
+  recurring_base_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS subtasks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  is_complete INTEGER NOT NULL DEFAULT 0,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS pomodoro_sessions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL,
+  phase TEXT NOT NULL,          -- 'work'|'short_break'|'long_break'
+  duration_s INTEGER NOT NULL,
+  started_at TEXT NOT NULL DEFAULT (datetime('now')),
+  completed_at TEXT,
+  was_completed INTEGER NOT NULL DEFAULT 0
+);
+```
+
+## IPC Channels (src/shared/ipc-channels.ts)
+- `tasks:get-all`, `tasks:get-by-id`, `tasks:create`, `tasks:update`, `tasks:delete`, `tasks:reorder`, `tasks:complete`
+- `categories:get-all` (returns `CategoryWithCount`), `categories:create`, `categories:update`, `categories:delete`
+- `subtasks:get-by-task`, `subtasks:create`, `subtasks:update`, `subtasks:delete`, `subtasks:reorder`
+- `pomodoro:start-session`, `pomodoro:complete-session`
+- `app:minimize-to-tray`, `app:quit`
+
+## Key Implementation Notes
+
+### Critical build notes
+- `better-sqlite3` is a native addon — run `npx electron-rebuild -f -w better-sqlite3` after install
+- Mark `better-sqlite3` as `external` in the main-process Vite config
+- Packaging: add `"asarUnpack": ["**/*.node"]` to electron-builder config
+
+### System Tray
+- `mainWindow.on('close', e => { e.preventDefault(); mainWindow.hide() })` — hides instead of closing
+- `app.on('before-quit')` sets a flag to allow real exit from tray menu "Quit"
+
+### Dark Mode
+- Tailwind `darkMode: 'class'`; add `class="dark"` to `<html>` unconditionally in `index.html`
+
+### Clock (`useLiveClock` + `LiveClock.tsx`)
+- `setInterval` every 1s updating a `Date` state; cleanup in `useEffect` return
+- Display: `text-7xl font-mono` to prevent layout shift; dimmed seconds
+
+### Before 5PM Banner (`useBefore5pm` + `Before5pmBanner.tsx`)
+- Filter tasks: `due_before_5pm=true AND is_complete=false`
+- Countdown = `differenceInSeconds(setHours(today,17,0,0,0), now)`; show "OVERDUE" in red after 5pm
+- Style: full-width amber banner with `animate-pulse` border
+
+### Categories Sidebar — "always visible" ADHD fix
+- Fixed sidebar, never collapses, always renders all categories
+- `categories:get-all` returns task count per category via JOIN
+- "All Tasks" is a hardcoded first entry (no DB row)
+- Active category stored in Zustand; filters `tasks:get-all` payload
+
+### Brain Dump (`BrainDumpInput.tsx`)
+- FAB fixed bottom-right; `Ctrl+Space` global keydown listener toggles it
+- On Enter: `tasks:create` with title + active category (or Inbox). Stay open for rapid entry. Escape closes.
+
+### Focus Mode (`FocusMode.tsx`)
+- Full-screen `position: fixed inset-0 z-50` overlay; toggled via Zustand `focusMode`
+- TaskCard "Focus" button sets `focusTaskId` in store before entering
+- `PomodoroTimer` only renders inside FocusMode
+
+### Pomodoro (`usePomodoro.ts`)
+- State machine: `idle → work(25m) → short_break(5m)` × 4, then `long_break(30m)`, repeat
+- `setInterval` countdown; `sessionIndex` 0–3 tracks position in cycle
+- SVG circle arc (`stroke-dashoffset`) for progress; 4 dot indicators
+- IPC only at session start/end (for logging); timer logic stays in renderer
+
+### Drag-to-Reorder (`@dnd-kit`)
+- `DndContext` + `SortableContext` wrapping `TaskList`; each `TaskCard` uses `useSortable`
+- `onDragEnd`: `arrayMove` → optimistic local update → `tasks:reorder` IPC
+- Revert on IPC failure
+
+### Recurring Tasks
+- On `tasks:complete` for a recurring task: mark complete, INSERT new row with `due_date` advanced by `addDays`/`addWeeks`/`addMonths` (date-fns in main process)
+
+### Gamification
+- `GamificationStub.tsx` — empty component with a TODO comment
+- `pomodoro_sessions` table already logs data for future use
+- Research agent running in background; findings saved to memory for next session
+
+## Build & Package Commands
+```bash
+npm create @quick-start/electron adhd-todo -- --template react-ts
+cd adhd-todo
+npm install better-sqlite3 @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities date-fns zustand
+npm install -D tailwindcss postcss autoprefixer electron-rebuild electron-builder
+npx tailwindcss init -p
+npx shadcn@latest init
+npx shadcn@latest add button dialog input label badge tooltip
+npx electron-rebuild -f -w better-sqlite3
+npm run dev          # hot reload
+npm run build && npx electron-builder --win   # produces .exe in release/
+```
+
+## Verification
+1. `npm run dev` — app launches, tray icon appears, window opens/hides correctly
+2. Add a task → appears in list; reload app → task persists (SQLite)
+3. Mark a recurring daily task complete → new task appears with tomorrow's date
+4. Brain dump: `Ctrl+Space` → type → Enter → task appears instantly
+5. Pomodoro: start → 25min countdown → auto-transitions to break → 4th break is 30min
+6. Before5pmBanner: add a task with `due_before_5pm=true` → banner appears with countdown
+7. Drag a task → order persists after reload
+
+## Gamification (follow-up)
+- Background agent `ac5292acbafe192e8` is researching ADHD gamification patterns
+- Findings will be saved to memory; implement in a separate session after core app is complete

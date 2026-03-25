@@ -1,0 +1,7 @@
+@echo off
+set EXE=%~dp0release\win-unpacked\ADHD Todo.exe
+if exist "%EXE%" (
+    start "" "%EXE%"
+) else (
+    start "" /b cmd /c "cd /d %~dp0 && npm run dev"
+)

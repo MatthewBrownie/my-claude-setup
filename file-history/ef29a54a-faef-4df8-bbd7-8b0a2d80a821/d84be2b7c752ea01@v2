@@ -1,0 +1,7 @@
+' ADHD Todo — Silent Launcher
+' Double-click this file (or a shortcut to it) to open the app without a terminal window.
+' Right-click this file → "Create shortcut", then pin the shortcut to your desktop or taskbar.
+
+Set WshShell = WScript.CreateObject("WScript.Shell")
+WshShell.Run "cmd /c cd /d ""C:\Users\mbrow\Documents\to-dos\adhd-todo"" && npm run dev", 0, False
+Set WshShell = Nothing

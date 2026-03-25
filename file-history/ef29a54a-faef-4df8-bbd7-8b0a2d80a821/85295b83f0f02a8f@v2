@@ -1,0 +1,34 @@
+import { create } from 'zustand'
+
+interface AppState {
+  // Which category is selected in the sidebar (null = "All Tasks")
+  activeCategoryId: number | null
+  setActiveCategoryId: (id: number | null) => void
+
+  // Focus mode: hides everything except the current task + Pomodoro
+  focusMode: boolean
+  focusTaskId: number | null
+  enterFocusMode: (taskId: number) => void
+  exitFocusMode: () => void
+
+  // Brain dump quick-add panel
+  brainDumpOpen: boolean
+  toggleBrainDump: () => void
+  openBrainDump: () => void
+  closeBrainDump: () => void
+}
+
+export const useAppStore = create<AppState>((set) => ({
+  activeCategoryId: null,
+  setActiveCategoryId: (id) => set({ activeCategoryId: id }),
+
+  focusMode: false,
+  focusTaskId: null,
+  enterFocusMode: (taskId) => set({ focusMode: true, focusTaskId: taskId }),
+  exitFocusMode: () => set({ focusMode: false, focusTaskId: null }),
+
+  brainDumpOpen: false,
+  toggleBrainDump: () => set((s) => ({ brainDumpOpen: !s.brainDumpOpen })),
+  openBrainDump: () => set({ brainDumpOpen: true }),
+  closeBrainDump: () => set({ brainDumpOpen: false })
+}))

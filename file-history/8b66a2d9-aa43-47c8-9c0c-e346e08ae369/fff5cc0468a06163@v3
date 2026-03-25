@@ -1,0 +1,26 @@
+# My Notes for James
+
+This file is read by the James agent at the start of each session.
+Write anything here you want James to be aware of: meeting notes, observations while developing, architectural decisions already made, context about the project.
+
+The James agent will never modify this file.
+
+---
+
+<!-- Add your notes below -->
+
+
+Date: 3 March 2026
+Currently have two primary open issues with James:
+
+1) BIG. The Enrichment Definition / Enrichment Pipeline system. 
+- We have enrichments that will be essentially starting off with the same steps: referencing a document, getting all the text chunks, and then performing a task on these text chunks.
+- The two steps: referencing a document and gathering the text chunks can then be taken away from the enrichments that use this system, which should make the enrichments simpler for the next person who wants to develop an enrichment like this.
+	- sample extra enrichments would be like extracting all the job titles from text, or drug names. We have no plan to do this right now.
+- James says this needs to use some kind of an interface which would define the functions that each of these would use. I think this would be something like:
+	- parsing the text: takes in the text, performs its job (such as extracting all temporal entities)
+	- writing to neo: writes whatever nodes to Neo (such as all the requirement nodes)
+	- then, whatever other functions are necessary are just local to that one extractor?
+- the actual extractions don't matter right now, and we don't erally care about them. The architecture is what is most important
+- The current implementation is just a broad-stroke first pass which I am not happy with or proud of
+- The enrichments should register with whatever EnrichmentRegistration system we put in place 

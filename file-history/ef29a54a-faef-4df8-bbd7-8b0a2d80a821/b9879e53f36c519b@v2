@@ -1,0 +1,89 @@
+// Typed wrappers around window.electron.ipcRenderer.invoke.
+// The renderer imports from here — never calls ipcRenderer directly.
+
+import { IPC } from '@shared/ipc-channels'
+import type {
+  Task,
+  Category,
+  CategoryWithCount,
+  Subtask,
+  CreateTaskPayload,
+  UpdateTaskPayload,
+  CreateCategoryPayload,
+  UpdateCategoryPayload,
+  CreateSubtaskPayload,
+  UpdateSubtaskPayload,
+  PomodoroSession
+} from '@shared/types'
+
+const invoke = (channel: string, payload?: unknown) =>
+  window.electron.ipcRenderer.invoke(channel, payload)
+
+// ── Tasks ─────────────────────────────────────────────────────────────────────
+
+export const getAllTasks = (opts?: {
+  categoryId?: number
+  includeComplete?: boolean
+}): Promise<Task[]> => invoke(IPC.TASKS.GET_ALL, opts)
+
+export const getTaskById = (id: number): Promise<Task | null> =>
+  invoke(IPC.TASKS.GET_BY_ID, { id })
+
+export const createTask = (payload: CreateTaskPayload): Promise<Task> =>
+  invoke(IPC.TASKS.CREATE, payload)
+
+export const updateTask = (payload: UpdateTaskPayload): Promise<Task> =>
+  invoke(IPC.TASKS.UPDATE, payload)
+
+export const deleteTask = (id: number): Promise<void> => invoke(IPC.TASKS.DELETE, { id })
+
+export const reorderTasks = (orderedIds: number[]): Promise<void> =>
+  invoke(IPC.TASKS.REORDER, { orderedIds })
+
+export const completeTask = (id: number): Promise<Task> => invoke(IPC.TASKS.COMPLETE, { id })
+
+// ── Categories ────────────────────────────────────────────────────────────────
+
+export const getAllCategories = (): Promise<CategoryWithCount[]> =>
+  invoke(IPC.CATEGORIES.GET_ALL)
+
+export const createCategory = (payload: CreateCategoryPayload): Promise<Category> =>
+  invoke(IPC.CATEGORIES.CREATE, payload)
+
+export const updateCategory = (payload: UpdateCategoryPayload): Promise<Category> =>
+  invoke(IPC.CATEGORIES.UPDATE, payload)
+
+export const deleteCategory = (id: number): Promise<void> =>
+  invoke(IPC.CATEGORIES.DELETE, { id })
+
+// ── Subtasks ──────────────────────────────────────────────────────────────────
+
+export const getSubtasksByTask = (taskId: number): Promise<Subtask[]> =>
+  invoke(IPC.SUBTASKS.GET_BY_TASK, { taskId })
+
+export const createSubtask = (payload: CreateSubtaskPayload): Promise<Subtask> =>
+  invoke(IPC.SUBTASKS.CREATE, payload)
+
+export const updateSubtask = (payload: UpdateSubtaskPayload): Promise<Subtask> =>
+  invoke(IPC.SUBTASKS.UPDATE, payload)
+
+export const deleteSubtask = (id: number): Promise<void> => invoke(IPC.SUBTASKS.DELETE, { id })
+
+export const reorderSubtasks = (taskId: number, orderedIds: number[]): Promise<void> =>
+  invoke(IPC.SUBTASKS.REORDER, { taskId, orderedIds })
+
+// ── Pomodoro ──────────────────────────────────────────────────────────────────
+
+export const startPomodoroSession = (payload: {
+  taskId?: number
+  phase: PomodoroSession['phase']
+  durationS: number
+}): Promise<{ sessionId: number }> => invoke(IPC.POMODORO.START_SESSION, payload)
+
+export const completePomodoroSession = (sessionId: number): Promise<void> =>
+  invoke(IPC.POMODORO.COMPLETE_SESSION, { sessionId })
+
+// ── App ───────────────────────────────────────────────────────────────────────
+
+export const minimizeToTray = (): Promise<void> => invoke(IPC.APP.MINIMIZE_TO_TRAY)
+export const quitApp = (): Promise<void> => invoke(IPC.APP.QUIT)

@@ -1,0 +1,20 @@
+import { contextBridge, ipcRenderer } from 'electron'
+import { IPC } from '@shared/ipc-channels'
+
+// Expose a whitelist of invoke calls to the renderer via window.electron.
+// This keeps contextIsolation intact — the renderer never touches Node APIs directly.
+const api = {
+  invoke: (channel: string, ...args: unknown[]) => {
+    // Only allow channels defined in our IPC constants
+    const allowed = Object.values(IPC).flatMap((group) => Object.values(group))
+    if (!allowed.includes(channel)) {
+      throw new Error(`IPC channel not allowed: ${channel}`)
+    }
+    return ipcRenderer.invoke(channel, ...args)
+  }
+}
+
+contextBridge.exposeInMainWorld('electron', { ipcRenderer: api })
+
+// TypeScript declaration for window.electron in the renderer
+export type ElectronApi = typeof api

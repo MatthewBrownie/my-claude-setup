@@ -1,0 +1,34 @@
+import { useState, useCallback } from 'react'
+import type { CategoryWithCount, CreateCategoryPayload, UpdateCategoryPayload } from '@shared/types'
+import * as ipc from '@renderer/lib/ipc'
+
+export function useCategories() {
+  const [categories, setCategories] = useState<CategoryWithCount[]>([])
+  const [loading, setLoading] = useState(false)
+
+  const refresh = useCallback(async () => {
+    setLoading(true)
+    try {
+      setCategories(await ipc.getAllCategories())
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const addCategory = useCallback(async (payload: CreateCategoryPayload) => {
+    await ipc.createCategory(payload)
+    await refresh()
+  }, [refresh])
+
+  const editCategory = useCallback(async (payload: UpdateCategoryPayload) => {
+    await ipc.updateCategory(payload)
+    await refresh()
+  }, [refresh])
+
+  const removeCategory = useCallback(async (id: number) => {
+    await ipc.deleteCategory(id)
+    await refresh()
+  }, [refresh])
+
+  return { categories, loading, refresh, addCategory, editCategory, removeCategory }
+}

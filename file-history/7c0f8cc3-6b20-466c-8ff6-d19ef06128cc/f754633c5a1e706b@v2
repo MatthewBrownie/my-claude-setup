@@ -1,0 +1,51 @@
+import { useState, useEffect, useRef, useCallback } from 'react'
+import * as ipc from '@renderer/lib/ipc'
+
+export function useWorkTimer() {
+  const [isRunning, setIsRunning] = useState(false)
+  const [sessionSeconds, setSessionSeconds] = useState(0)
+  const [todayTotalSeconds, setTodayTotalSeconds] = useState(0)
+
+  const sessionIdRef = useRef<number | null>(null)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Load today's completed total on mount
+  useEffect(() => {
+    ipc.getTodayWorkTotal().then(setTodayTotalSeconds).catch(() => {})
+  }, [])
+
+  // Tick the session counter every second while running
+  useEffect(() => {
+    if (!isRunning) return
+    intervalRef.current = setInterval(() => {
+      setSessionSeconds((s) => s + 1)
+    }, 1000)
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+    }
+  }, [isRunning])
+
+  const toggle = useCallback(async () => {
+    if (!isRunning) {
+      // Clock in
+      const { id } = await ipc.startWorkSession()
+      sessionIdRef.current = id
+      setSessionSeconds(0)
+      setIsRunning(true)
+    } else {
+      // Clock out
+      if (intervalRef.current) clearInterval(intervalRef.current)
+      if (sessionIdRef.current !== null) {
+        await ipc.stopWorkSession(sessionIdRef.current)
+        sessionIdRef.current = null
+      }
+      setIsRunning(false)
+      // Re-fetch the authoritative total from DB (includes the session we just ended)
+      const total = await ipc.getTodayWorkTotal()
+      setTodayTotalSeconds(total)
+      setSessionSeconds(0)
+    }
+  }, [isRunning])
+
+  return { isRunning, sessionSeconds, todayTotalSeconds, toggle }
+}

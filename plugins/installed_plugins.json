@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "plugins": {
+    "clangd-lsp@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "C:\\Users\\mbrow\\.claude\\plugins\\cache\\claude-plugins-official\\clangd-lsp\\1.0.0",
+        "version": "1.0.0",
+        "installedAt": "2026-03-23T18:18:11.884Z",
+        "lastUpdated": "2026-03-23T18:18:11.884Z",
+        "gitCommitSha": "61c0597779bd2d670dcd4fbbf37c66aa19eb2ce6"
+      }
+    ]
+  }
+}

@@ -1,0 +1,25 @@
+import type { RecurringPattern } from '@shared/types'
+import { RefreshCw } from 'lucide-react'
+
+interface RecurringBadgeProps {
+  pattern: RecurringPattern
+}
+
+const LABELS: Record<Exclude<RecurringPattern, 'none'>, string> = {
+  daily: 'Daily',
+  weekly: 'Weekly',
+  monthly: 'Monthly'
+}
+
+export function RecurringBadge({ pattern }: RecurringBadgeProps) {
+  if (pattern === 'none') return null
+  return (
+    <span
+      title={`Repeats ${LABELS[pattern].toLowerCase()}`}
+      className="inline-flex items-center gap-1 text-[10px] text-muted-foreground"
+    >
+      <RefreshCw className="h-2.5 w-2.5" />
+      {LABELS[pattern]}
+    </span>
+  )
+}

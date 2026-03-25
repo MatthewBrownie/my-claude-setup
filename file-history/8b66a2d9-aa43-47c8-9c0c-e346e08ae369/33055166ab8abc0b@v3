@@ -1,0 +1,31 @@
+# James Agent Notes
+_Last updated: —_
+
+## Standing concerns
+<!-- Architectural decisions, persistent preferences, or constraints that should always be on James's radar.
+     These are never pruned unless the user explicitly says to remove one. -->
+
+## Active topics
+<!-- One entry per topic currently in play.
+     Format:
+       [YYYY-MM-DD] Topic name: brief description of where things stand
+       [DONE YYYY-MM-DD] Topic name: one-line outcome summary
+
+     Pruning rules:
+       - Mark complete with [DONE YYYY-MM-DD] and condense to one line immediately.
+       - Topics not touched in 14+ days: condense to a single line.
+       - Topics and completed items are NEVER removed — they stay as one-liners indefinitely. -->
+
+## Session log
+<!-- One entry per session, most recent first.
+     Format: [YYYY-MM-DD] Brief summary of what was discussed and any decisions reached.
+
+     Pruning rule: entries older than 30 days are removed. -->
+
+## Learning journey
+<!-- Concepts, patterns, and techniques encountered or being internalised.
+     Format:
+       [YYYY-MM-DD] Concept: status — brief note
+     Status: introduced | practicing | understood
+     'Understood' entries are kept permanently as one-liners.
+     'Introduced' and 'practicing' entries are condensed after 14 days but never removed. -->

@@ -1,0 +1,144 @@
+import { useState, useEffect, useCallback, useRef } from 'react'
+import * as ipc from '@renderer/lib/ipc'
+
+// Pomodoro cycle: 4 work sessions of 25min, each followed by a 5min break,
+// with a 30min long break after the 4th session.
+const WORK_S = 25 * 60
+const SHORT_BREAK_S = 5 * 60
+const LONG_BREAK_S = 30 * 60
+
+type Phase = 'idle' | 'work' | 'short_break' | 'long_break'
+
+export interface PomodoroState {
+  phase: Phase
+  sessionIndex: number  // 0–3, which of the 4 work sessions we're on
+  remainingS: number
+  totalS: number        // total seconds for the current phase (for progress calc)
+  isRunning: boolean
+  completedSessions: number // work sessions completed this cycle
+}
+
+export interface PomodoroControls {
+  start: (taskId?: number) => void
+  stop: () => void
+  reset: () => void
+}
+
+export function usePomodoro(): [PomodoroState, PomodoroControls] {
+  const [state, setState] = useState<PomodoroState>({
+    phase: 'idle',
+    sessionIndex: 0,
+    remainingS: WORK_S,
+    totalS: WORK_S,
+    isRunning: false,
+    completedSessions: 0
+  })
+
+  const sessionIdRef = useRef<number | null>(null)
+  const taskIdRef = useRef<number | undefined>(undefined)
+
+  // Advance to the next phase when a session ends
+  const advance = useCallback((prevState: PomodoroState) => {
+    if (sessionIdRef.current !== null) {
+      ipc.completePomodoroSession(sessionIdRef.current).catch(() => {})
+      sessionIdRef.current = null
+    }
+
+    const nextCompleted = prevState.completedSessions + (prevState.phase === 'work' ? 1 : 0)
+
+    let nextPhase: Phase
+    let nextTotal: number
+
+    if (prevState.phase === 'work') {
+      if (nextCompleted % 4 === 0) {
+        // After 4th work session → long break, reset cycle
+        nextPhase = 'long_break'
+        nextTotal = LONG_BREAK_S
+      } else {
+        nextPhase = 'short_break'
+        nextTotal = SHORT_BREAK_S
+      }
+    } else {
+      // After a break → next work session
+      nextPhase = 'work'
+      nextTotal = WORK_S
+    }
+
+    const newSessionIndex = nextPhase === 'work' ? nextCompleted % 4 : prevState.sessionIndex
+
+    // Log the next session start
+    const phase = nextPhase === 'work' ? 'work' : nextPhase === 'short_break' ? 'short_break' : 'long_break'
+    ipc
+      .startPomodoroSession({ taskId: taskIdRef.current, phase, durationS: nextTotal })
+      .then(({ sessionId }) => {
+        sessionIdRef.current = sessionId
+      })
+      .catch(() => {})
+
+    return {
+      phase: nextPhase,
+      sessionIndex: newSessionIndex,
+      remainingS: nextTotal,
+      totalS: nextTotal,
+      isRunning: true, // auto-start next phase
+      completedSessions: nextCompleted
+    }
+  }, [])
+
+  // Tick the timer every second when running
+  useEffect(() => {
+    if (!state.isRunning) return
+
+    const id = setInterval(() => {
+      setState((prev) => {
+        if (prev.remainingS <= 1) {
+          return advance(prev)
+        }
+        return { ...prev, remainingS: prev.remainingS - 1 }
+      })
+    }, 1000)
+
+    return () => clearInterval(id)
+  }, [state.isRunning, advance])
+
+  const start = useCallback((taskId?: number) => {
+    taskIdRef.current = taskId
+    setState((prev) => {
+      const phase = prev.phase === 'idle' ? 'work' : prev.phase
+      const total = phase === 'work' ? WORK_S : phase === 'short_break' ? SHORT_BREAK_S : LONG_BREAK_S
+      const remaining = prev.phase === 'idle' ? WORK_S : prev.remainingS
+
+      ipc
+        .startPomodoroSession({
+          taskId,
+          phase: phase as 'work' | 'short_break' | 'long_break',
+          durationS: total
+        })
+        .then(({ sessionId }) => {
+          sessionIdRef.current = sessionId
+        })
+        .catch(() => {})
+
+      return { ...prev, phase, totalS: total, remainingS: remaining, isRunning: true }
+    })
+  }, [])
+
+  const stop = useCallback(() => {
+    setState((prev) => ({ ...prev, isRunning: false }))
+  }, [])
+
+  const reset = useCallback(() => {
+    sessionIdRef.current = null
+    taskIdRef.current = undefined
+    setState({
+      phase: 'idle',
+      sessionIndex: 0,
+      remainingS: WORK_S,
+      totalS: WORK_S,
+      isRunning: false,
+      completedSessions: 0
+    })
+  }, [])
+
+  return [state, { start, stop, reset }]
+}

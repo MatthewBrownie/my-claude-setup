@@ -1,0 +1,24 @@
+' ADHD Todo — Silent Launcher
+' Double-click this file (or a shortcut to it) to open the app without a terminal window.
+' Right-click → "Create shortcut", then drag the shortcut to your desktop or taskbar.
+'
+' Launches the packaged exe if it exists (release/win-unpacked/),
+' otherwise falls back to npm run dev (hot-reload dev mode).
+
+Dim WshShell, fso, exePath, projectDir
+Set WshShell = WScript.CreateObject("WScript.Shell")
+Set fso = WScript.CreateObject("Scripting.FileSystemObject")
+
+projectDir = "C:\Users\mbrow\Documents\to-dos\adhd-todo"
+exePath = projectDir & "\release\win-unpacked\ADHD Todo.exe"
+
+If fso.FileExists(exePath) Then
+    ' Run the packaged production build
+    WshShell.Run """" & exePath & """", 0, False
+Else
+    ' Fall back to dev mode
+    WshShell.Run "cmd /c cd /d """ & projectDir & """ && npm run dev", 0, False
+End If
+
+Set WshShell = Nothing
+Set fso = Nothing

@@ -1,0 +1,11 @@
+import { ipcMain } from 'electron'
+import { IPC } from '@shared/ipc-channels'
+import { getDb } from '../db'
+import { getStats, getTodayPomodoroCount } from '../db/gamification'
+
+export function registerGamificationHandlers(): void {
+  ipcMain.handle(IPC.GAMIFICATION.GET_STATS, () => {
+    const db = getDb()
+    return { ...getStats(db), todayPomodoros: getTodayPomodoroCount(db) }
+  })
+}

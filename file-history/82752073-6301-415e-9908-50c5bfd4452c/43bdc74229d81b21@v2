@@ -1,0 +1,120 @@
+# ADHD Todo
+
+A personal ADHD-friendly desktop to-do app built with Electron, React, TypeScript, and SQLite.
+
+## Features
+
+- **Categories** — always visible in sidebar (out of sight = forgotten)
+- **Collapsible sidebar** — hide the whole left panel to see just your tasks and the clock
+- **DO BEFORE 5PM** banner with live countdown clock; turns urgent (pulsing red) at 4:45 PM
+- **Priority** — rate tasks 1–10; high-priority badges (P7–P10) appear on task cards
+- **Sort modes** — free order, grouped by category, or grouped by priority; drag to reorder within groups
+- **Recurring tasks** — daily, weekly, monthly (auto-creates next occurrence on completion)
+- **Subtasks** with per-subtask descriptions; inline tick-off from task card or focus mode
+- **Task descriptions** — optional freeform notes on tasks and subtasks
+- **Done section** — completed tasks persist in a collapsible "Done (N)" section at the bottom of the list
+- **Pomodoro timer** — 4 × (25 min work + 5 min break) + 30 min long break
+- **Focus mode** — full-screen overlay showing the current task, its description, subtasks, and Pomodoro timer; mark the task complete and auto-advance to the next one (press Escape to exit)
+- **Brain dump** — Ctrl+Space quick-add strip at the top of the main view
+- **Gamification** — XP + level bar in sidebar, task completion animation, Pomodoro counter
+- **Work timer** — clock in/out button in the sidebar; live elapsed time and daily total persisted to the database
+- **System tray** — closing hides to tray; click tray icon to reopen; "Start on login" toggle
+- Always dark mode
+
+## Running the app
+
+**Packaged (normal use):**
+Double-click `launch.bat` in this folder. Creates no terminal window and falls back to dev mode if the exe isn't present.
+
+The packaged exe lives at:
+```
+release\win-unpacked\ADHD Todo.exe
+```
+
+**Dev mode (hot reload):**
+```bash
+npm run dev
+```
+
+## Getting launch.bat working after code changes
+
+`launch.bat` checks for the packaged exe first. If it finds one it runs that — which won't have your latest changes. To get the batch file launching the updated app again you have two options:
+
+**Option A — Rebuild the exe (recommended for normal use):**
+```bash
+npm run pack
+```
+After this, `launch.bat` will launch the freshly built exe with all your changes.
+
+**Option B — Force dev mode (quickest for active development):**
+Delete or rename the `release\win-unpacked\` folder. With no exe present, `launch.bat` falls back to `npm run dev` automatically, which always reflects the latest code.
+
+---
+
+## Rebuilding the packaged exe
+
+After making code changes:
+```bash
+npm run pack
+```
+
+> The command will print a `winCodeSign` symlink error at the very end — **ignore it**. The exe in `release\win-unpacked\` is fully built before that error occurs. It's an electron-builder quirk on Windows without Developer Mode enabled.
+
+If you've reinstalled Node or switched Node versions, rebuild the native SQLite addon first:
+```bash
+npm run rebuild
+npm run pack
+```
+
+## Data / backups
+
+Your tasks, stats, and work sessions are stored in a SQLite database at:
+```
+%APPDATA%\adhd-todo\adhd-todo.db
+```
+
+To back up: copy that file somewhere safe. To restore: replace it with your backup before launching the app.
+
+## Project structure
+
+```
+src/
+  main/         — Electron main process (IPC handlers, SQLite, tray)
+    db/         — Database layer
+                    migrations.ts      — schema creation and ALTER TABLE migrations
+                    tasks.ts           — task CRUD + recurring logic
+                    subtasks.ts        — subtask CRUD
+                    categories.ts      — category CRUD
+                    gamification.ts    — XP / level helpers
+                    pomodoro.ts        — Pomodoro session logging
+                    workSessions.ts    — work timer session logging
+    ipc/        — IPC handler registration (one file per domain)
+  preload/      — contextBridge whitelist
+  renderer/     — React app
+    components/ — UI components
+      focus/    — FocusMode overlay + PomodoroTimer
+      tasks/    — TaskCard, TaskList, TaskForm, SubtaskList
+      clock/    — LiveClock, WorkTimer
+      layout/   — Header, Sidebar
+      ...
+    hooks/      — Data-fetching and state hooks
+                    useTasks.ts        — task list with optional completed-task inclusion
+                    useSubtasks.ts     — subtask list with add/update/toggle/remove
+                    useCategories.ts   — category list
+                    useUserStats.ts    — XP / gamification stats
+                    usePomodoro.ts     — Pomodoro timer state machine
+                    useWorkTimer.ts    — clock-in/out state, persists sessions to DB
+    store/      — Zustand ephemeral UI state (active category, focus mode, sidebar collapse)
+    lib/ipc.ts  — Typed renderer-side IPC wrappers
+  shared/       — Types and IPC channel constants shared across all processes
+resources/
+  icon.ico      — App icon (256×256 PNG-embedded ICO)
+release/
+  win-unpacked/ — Packaged app output (not committed to git)
+launch.bat      — Double-click launcher (recommended)
+launch.vbs      — Silent launcher (requires .vbs→wscript.exe file association)
+```
+
+## Auto-start on login
+
+Right-click the system tray icon → **Start on login**. Uses the packaged exe path — only works correctly when running from `release\win-unpacked\`, not dev mode.

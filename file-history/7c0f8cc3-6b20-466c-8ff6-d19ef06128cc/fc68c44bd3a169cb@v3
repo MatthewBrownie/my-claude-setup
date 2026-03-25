@@ -1,0 +1,54 @@
+import { cn } from '@renderer/lib/utils'
+
+interface WorkTimerProps {
+  isRunning: boolean
+  sessionSeconds: number
+  todayTotalSeconds: number
+  toggle: () => void
+}
+
+/** Format a duration in seconds as H:MM:SS */
+function formatDuration(totalSeconds: number): string {
+  const h = Math.floor(totalSeconds / 3600)
+  const m = Math.floor((totalSeconds % 3600) / 60)
+  const s = totalSeconds % 60
+  return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
+
+/** Format total seconds as "Xh Ym" (or "Ym" if under an hour) */
+function formatTotal(totalSeconds: number): string {
+  const h = Math.floor(totalSeconds / 3600)
+  const m = Math.floor((totalSeconds % 3600) / 60)
+  if (h > 0) return `${h}h ${m}m`
+  return `${m}m`
+}
+
+export function WorkTimer({ isRunning, sessionSeconds, todayTotalSeconds, toggle }: WorkTimerProps) {
+  return (
+    <div className="px-3 py-2.5 border-b border-border">
+      <div className="flex items-center gap-2">
+        {/* Record button */}
+        <button
+          onClick={toggle}
+          title={isRunning ? 'Clock out' : 'Clock in'}
+          className={cn(
+            'flex-shrink-0 w-3.5 h-3.5 rounded-full border-2 transition-colors',
+            isRunning
+              ? 'bg-red-500 border-red-500 animate-pulse'
+              : 'bg-transparent border-muted-foreground hover:border-red-400'
+          )}
+        />
+
+        {/* Elapsed time while running, or idle label */}
+        <span className={cn('text-xs font-mono', isRunning ? 'text-foreground' : 'text-muted-foreground')}>
+          {isRunning ? formatDuration(sessionSeconds) : 'Off the clock'}
+        </span>
+      </div>
+
+      {/* Today's total */}
+      <p className="mt-1 text-[10px] text-muted-foreground pl-5">
+        Today: {formatTotal(todayTotalSeconds + (isRunning ? sessionSeconds : 0))}
+      </p>
+    </div>
+  )
+}

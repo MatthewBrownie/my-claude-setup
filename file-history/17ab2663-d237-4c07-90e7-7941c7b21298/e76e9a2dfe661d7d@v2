@@ -1,0 +1,32 @@
+# Context
+
+The user asked how to register custom agents in `~/.claude/agents/`. The agents already exist with correct frontmatter (`name`, `description`, `tools`, `model`). No registration step is needed — Claude Code auto-discovers them.
+
+# How It Works
+
+Claude Code auto-discovers all `.md` files in these locations at session start:
+- `~/.claude/agents/` — user-scoped (all projects) ← your agents live here
+- `.claude/agents/` — project-scoped (per repo)
+
+No CLI command, config change, or restart is required. Files are picked up automatically.
+
+# Your Current Agents (all valid)
+
+| File | Name |
+|------|------|
+| `function-tracer.md` | `function-tracer` |
+| `function-diagram.md` | `function-diagram` |
+| `test-runner.md` | `test-runner` |
+| `test-reporter.md` | `test-reporter` |
+| `test-writer.md` | `test-writer` |
+| `testing-manager.md` | `testing-manager` |
+
+# How to Invoke Them
+
+1. **@-mention** — type `@function-tracer` in the prompt (autocomplete should offer it)
+2. **Natural language** — "use the function-tracer agent to trace X"
+3. **Auto-delegation** — Claude matches your request against each agent's `description` field and delegates automatically
+
+# Nothing to Change
+
+The files are correctly formatted and in the right location. No action needed — they are already registered.

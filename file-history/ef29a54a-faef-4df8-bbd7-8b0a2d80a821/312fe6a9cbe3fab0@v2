@@ -1,0 +1,54 @@
+import type Database from 'better-sqlite3'
+import type { UserStats } from '@shared/types'
+
+function rowToStats(row: Record<string, unknown>): UserStats {
+  return {
+    totalXp: row.total_xp as number,
+    level: row.level as number,
+    updatedAt: row.updated_at as string
+  }
+}
+
+/** Returns the single user_stats row, creating it if missing. */
+export function getStats(db: Database.Database): UserStats {
+  const row = db.prepare('SELECT * FROM user_stats WHERE id = 1').get() as
+    | Record<string, unknown>
+    | undefined
+  if (!row) {
+    db.prepare('INSERT INTO user_stats (id, total_xp, level) VALUES (1, 0, 1)').run()
+    return { totalXp: 0, level: 1, updatedAt: new Date().toISOString() }
+  }
+  return rowToStats(row)
+}
+
+/**
+ * Add XP to the user's total and recompute level.
+ * Level formula: level = floor(totalXp / 100) + 1
+ * Returns updated stats.
+ */
+export function addXp(db: Database.Database, amount: number): UserStats {
+  const current = getStats(db)
+  const newXp = current.totalXp + amount
+  const newLevel = Math.floor(newXp / 100) + 1
+
+  db.prepare(`
+    UPDATE user_stats
+    SET total_xp = ?, level = ?, updated_at = datetime('now')
+    WHERE id = 1
+  `).run(newXp, newLevel)
+
+  return { totalXp: newXp, level: newLevel, updatedAt: new Date().toISOString() }
+}
+
+/** Count completed work-phase Pomodoro sessions started today. */
+export function getTodayPomodoroCount(db: Database.Database): number {
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM pomodoro_sessions
+       WHERE phase = 'work'
+         AND was_completed = 1
+         AND DATE(started_at) = DATE('now')`
+    )
+    .get() as { n: number }
+  return row.n
+}

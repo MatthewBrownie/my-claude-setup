@@ -1,0 +1,289 @@
+import { useState } from 'react'
+import type { Task, CategoryWithCount, CreateTaskPayload, UpdateTaskPayload } from '@shared/types'
+import { TaskCard } from './TaskCard'
+import { TaskForm } from './TaskForm'
+import { useAppStore } from '@renderer/store/appStore'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy
+} from '@dnd-kit/sortable'
+import { Plus, ChevronDown, ChevronRight, List, Layers, ArrowUpDown } from 'lucide-react'
+import { cn } from '@renderer/lib/utils'
+
+interface TaskListProps {
+  tasks: Task[]
+  doneTasks: Task[]
+  categories: CategoryWithCount[]
+  onAddTask: (payload: CreateTaskPayload) => Promise<void>
+  onEditTask: (payload: UpdateTaskPayload) => Promise<Task>
+  onDeleteTask: (id: number) => Promise<void>
+  onCompleteTask: (id: number) => Promise<void>
+  onReorder: (oldIndex: number, newIndex: number) => Promise<void>
+}
+
+interface TaskGroup {
+  key: string
+  label: string
+  tasks: Task[]
+}
+
+/** Group active tasks by category, ordered by category sortOrder. */
+function groupByCategory(tasks: Task[], categories: CategoryWithCount[]): TaskGroup[] {
+  const catMap = new Map(categories.map((c) => [c.id, c]))
+  const groups = new Map<string | number, TaskGroup>()
+
+  for (const task of tasks) {
+    const key = task.categoryId ?? 'uncategorized'
+    if (!groups.has(key)) {
+      const cat = task.categoryId != null ? catMap.get(task.categoryId) : undefined
+      groups.set(key, {
+        key: String(key),
+        label: cat?.name ?? 'Uncategorized',
+        tasks: []
+      })
+    }
+    groups.get(key)!.tasks.push(task)
+  }
+
+  // Sort groups: categorised ones by category sortOrder, uncategorised last
+  const sorted = [...groups.entries()].sort(([keyA], [keyB]) => {
+    if (keyA === 'uncategorized') return 1
+    if (keyB === 'uncategorized') return -1
+    const a = catMap.get(keyA as number)?.sortOrder ?? 0
+    const b = catMap.get(keyB as number)?.sortOrder ?? 0
+    return a - b
+  })
+
+  return sorted.map(([, group]) => group)
+}
+
+/** Group active tasks into High / Medium / Low priority tiers. */
+function groupByPriority(tasks: Task[]): TaskGroup[] {
+  const high: Task[] = []
+  const medium: Task[] = []
+  const low: Task[] = []
+
+  for (const task of tasks) {
+    if (task.priority >= 7) high.push(task)
+    else if (task.priority >= 4) medium.push(task)
+    else low.push(task)
+  }
+
+  const groups: TaskGroup[] = []
+  if (high.length > 0) groups.push({ key: 'high', label: 'High (7–10)', tasks: high })
+  if (medium.length > 0) groups.push({ key: 'medium', label: 'Medium (4–6)', tasks: medium })
+  if (low.length > 0) groups.push({ key: 'low', label: 'Low (1–3)', tasks: low })
+  return groups
+}
+
+export function TaskList({
+  tasks,
+  doneTasks,
+  categories,
+  onAddTask,
+  onEditTask,
+  onDeleteTask,
+  onCompleteTask,
+  onReorder
+}: TaskListProps) {
+  const { activeCategoryId, sortMode, setSortMode } = useAppStore()
+  const [showForm, setShowForm] = useState(false)
+  const [doneCollapsed, setDoneCollapsed] = useState(false)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates
+    })
+  )
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    if (sortMode !== 'free') {
+      // In grouped modes, look up global indices in the full active list.
+      // If the dragged task and drop target belong to different groups, do nothing.
+      const groups = sortMode === 'by-category'
+        ? groupByCategory(tasks, categories)
+        : groupByPriority(tasks)
+
+      const findGroup = (id: number | string) =>
+        groups.find((g) => g.tasks.some((t) => t.id === id))
+
+      const activeGroup = findGroup(active.id as number)
+      const overGroup = findGroup(over.id as number)
+      if (!activeGroup || !overGroup || activeGroup.key !== overGroup.key) return
+    }
+
+    const oldIndex = tasks.findIndex((t) => t.id === active.id)
+    const newIndex = tasks.findIndex((t) => t.id === over.id)
+    if (oldIndex !== -1 && newIndex !== -1) {
+      onReorder(oldIndex, newIndex)
+    }
+  }
+
+  const sortModeButtons = [
+    { mode: 'free' as const, icon: List, title: 'Free order' },
+    { mode: 'by-category' as const, icon: Layers, title: 'Group by category' },
+    { mode: 'by-priority' as const, icon: ArrowUpDown, title: 'Group by priority' }
+  ]
+
+  const renderGroupedTasks = () => {
+    const groups = sortMode === 'by-category'
+      ? groupByCategory(tasks, categories)
+      : groupByPriority(tasks)
+
+    if (groups.length === 0) return null
+
+    return (
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        {groups.map((group) => (
+          <div key={group.key} className="mb-2">
+            <p className="px-1 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              {group.label}
+            </p>
+            <SortableContext
+              items={group.tasks.map((t) => t.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-2">
+                {group.tasks.map((task) => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    categories={categories}
+                    onComplete={onCompleteTask}
+                    onEdit={onEditTask}
+                    onDelete={onDeleteTask}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </div>
+        ))}
+      </DndContext>
+    )
+  }
+
+  const renderFreeTasks = () => (
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+        <div className="space-y-2">
+          {tasks.map((task) => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              categories={categories}
+              onComplete={onCompleteTask}
+              onEdit={onEditTask}
+              onDelete={onDeleteTask}
+            />
+          ))}
+        </div>
+      </SortableContext>
+    </DndContext>
+  )
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header: Add task + sort mode toggle */}
+      <div className="flex-shrink-0 px-4 pt-4 pb-2 flex items-center gap-2">
+        <button
+          onClick={() => setShowForm(true)}
+          className="flex items-center gap-2 flex-1 px-4 py-2.5 rounded-md border border-dashed border-border text-sm text-muted-foreground hover:text-foreground hover:border-border/80 hover:bg-accent/30 transition-colors"
+        >
+          <Plus className="h-4 w-4" />
+          Add task
+        </button>
+
+        {/* Sort mode segmented control */}
+        <div className="flex items-center border border-border rounded-md overflow-hidden">
+          {sortModeButtons.map(({ mode, icon: Icon, title }) => (
+            <button
+              key={mode}
+              onClick={() => setSortMode(mode)}
+              title={title}
+              className={cn(
+                'p-2 transition-colors',
+                sortMode === mode
+                  ? 'bg-accent text-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" />
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-4 pb-4">
+        {/* Active task list */}
+        {tasks.length === 0 && doneTasks.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
+            <p className="text-sm">No tasks yet.</p>
+            <p className="text-xs mt-1">Add one above or use Brain Dump (Ctrl+Space).</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {sortMode === 'free' ? renderFreeTasks() : renderGroupedTasks()}
+          </div>
+        )}
+
+        {/* Done section */}
+        {doneTasks.length > 0 && (
+          <div className="pt-2">
+            <button
+              onClick={() => setDoneCollapsed((v) => !v)}
+              className={cn(
+                'flex items-center gap-1.5 w-full px-1 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors'
+              )}
+            >
+              {doneCollapsed ? (
+                <ChevronRight className="h-3 w-3" />
+              ) : (
+                <ChevronDown className="h-3 w-3" />
+              )}
+              Done ({doneTasks.length})
+            </button>
+
+            {!doneCollapsed && (
+              <div className="mt-1 space-y-2 opacity-60">
+                {doneTasks.map((task) => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    categories={categories}
+                    onComplete={onCompleteTask}
+                    onEdit={onEditTask}
+                    onDelete={onDeleteTask}
+                    readOnly
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {showForm && (
+        <TaskForm
+          categories={categories}
+          defaultCategoryId={activeCategoryId}
+          onSave={onAddTask as (payload: CreateTaskPayload | UpdateTaskPayload) => Promise<void>}
+          onClose={() => setShowForm(false)}
+        />
+      )}
+    </div>
+  )
+}

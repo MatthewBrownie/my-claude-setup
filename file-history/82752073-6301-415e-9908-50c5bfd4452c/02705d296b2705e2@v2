@@ -1,0 +1,63 @@
+import { Tray, Menu, app, BrowserWindow, nativeImage } from 'electron'
+import { join } from 'path'
+
+let tray: Tray | null = null
+
+/** Builds the tray context menu, reflecting current login-item state. */
+function buildContextMenu(mainWindow: BrowserWindow, trayRef: Tray): Menu {
+  const openAtLogin = app.getLoginItemSettings().openAtLogin
+
+  return Menu.buildFromTemplate([
+    {
+      label: 'Open',
+      click: () => {
+        mainWindow.show()
+        mainWindow.focus()
+      }
+    },
+    { type: 'separator' },
+    {
+      label: 'Start on login',
+      type: 'checkbox',
+      checked: openAtLogin,
+      click: () => {
+        app.setLoginItemSettings({ openAtLogin: !openAtLogin })
+        // Rebuild menu so the checkmark reflects the new state immediately
+        trayRef.setContextMenu(buildContextMenu(mainWindow, trayRef))
+      }
+    },
+    { type: 'separator' },
+    {
+      label: 'Quit',
+      click: () => {
+        app.quit()
+      }
+    }
+  ])
+}
+
+export function createTray(mainWindow: BrowserWindow): Tray {
+  let icon: Electron.NativeImage
+  try {
+    icon = nativeImage.createFromPath(join(__dirname, '../../resources/icon.ico'))
+  } catch {
+    icon = nativeImage.createEmpty()
+  }
+
+  tray = new Tray(icon)
+  tray.setToolTip('ADHD Todo')
+  tray.setContextMenu(buildContextMenu(mainWindow, tray))
+
+  const showWindow = () => {
+    if (mainWindow.isVisible()) {
+      mainWindow.focus()
+    } else {
+      mainWindow.show()
+    }
+  }
+
+  tray.on('click', showWindow)
+  tray.on('double-click', showWindow)
+
+  return tray
+}

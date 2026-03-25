@@ -1,0 +1,25 @@
+import { ipcMain, BrowserWindow } from 'electron'
+import { IPC } from '@shared/ipc-channels'
+import { registerTaskHandlers } from './tasks'
+import { registerCategoryHandlers } from './categories'
+import { registerSubtaskHandlers } from './subtasks'
+import { registerPomodoroHandlers } from './pomodoro'
+import { registerGamificationHandlers } from './gamification'
+import { registerWorkTimerHandlers } from './workTimer'
+
+export function registerAllHandlers(mainWindow: BrowserWindow): void {
+  registerTaskHandlers()
+  registerCategoryHandlers()
+  registerSubtaskHandlers()
+  registerPomodoroHandlers()
+  registerGamificationHandlers()
+  registerWorkTimerHandlers()
+
+  ipcMain.handle(IPC.APP.MINIMIZE_TO_TRAY, () => {
+    mainWindow.hide()
+  })
+
+  ipcMain.handle(IPC.APP.QUIT, () => {
+    mainWindow.destroy()
+  })
+}

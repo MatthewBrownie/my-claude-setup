@@ -1,0 +1,71 @@
+import { useEffect, useState, useRef } from 'react'
+import { useSubtasks } from '@renderer/hooks/useSubtasks'
+import { CheckSquare, Square, Trash2, Plus } from 'lucide-react'
+
+interface SubtaskListProps {
+  taskId: number
+}
+
+export function SubtaskList({ taskId }: SubtaskListProps) {
+  const { subtasks, refresh, add, toggle, remove } = useSubtasks(taskId)
+  const [newTitle, setNewTitle] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    refresh()
+  }, [taskId])
+
+  const handleAdd = async () => {
+    const title = newTitle.trim()
+    if (!title) return
+    await add(title)
+    setNewTitle('')
+    inputRef.current?.focus()
+  }
+
+  return (
+    <div className="ml-4 mt-2 space-y-1">
+      {subtasks.map((s) => (
+        <div key={s.id} className="flex items-center gap-2 group">
+          <button
+            onClick={() => toggle(s.id, !s.isComplete)}
+            className="flex-shrink-0 text-muted-foreground hover:text-primary transition-colors"
+          >
+            {s.isComplete ? (
+              <CheckSquare className="h-3.5 w-3.5 text-primary" />
+            ) : (
+              <Square className="h-3.5 w-3.5" />
+            )}
+          </button>
+          <span
+            className={`flex-1 text-xs ${s.isComplete ? 'line-through text-muted-foreground' : 'text-foreground'}`}
+          >
+            {s.title}
+          </span>
+          <button
+            onClick={() => remove(s.id)}
+            className="opacity-0 group-hover:opacity-100 p-0.5 text-muted-foreground hover:text-destructive transition-all"
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
+        </div>
+      ))}
+
+      {/* Inline add */}
+      <div className="flex items-center gap-2">
+        <Plus className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+        <input
+          ref={inputRef}
+          type="text"
+          placeholder="Add subtask…"
+          value={newTitle}
+          onChange={(e) => setNewTitle(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleAdd()
+          }}
+          className="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground focus:outline-none"
+        />
+      </div>
+    </div>
+  )
+}

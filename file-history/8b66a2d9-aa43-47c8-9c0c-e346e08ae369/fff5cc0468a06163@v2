@@ -1,0 +1,18 @@
+# My Notes for James
+
+This file is read by the James agent at the start of each session.
+Write anything here you want James to be aware of: meeting notes, observations while developing, architectural decisions already made, context about the project.
+
+The James agent will never modify this file.
+
+---
+
+<!-- Add your notes below -->
+
+Currently have two primary open issues with James:
+
+1) BIG. The Enrichment Definition / Enrichment Pipeline system. 
+- We have enrichments that will be essentially starting off with the same steps: referencing a document, getting all the text chunks, and then performing a task on these text chunks.
+- The two steps: referencing a document and gathering the text chunks can then be taken away from the enrichments that use this system, which should make the enrichments simpler for the next person who wants to develop an enrichment like this.
+	- sample extra enrichments would be like extracting all the job titles from text, or drug names. We have no plan to do this right now.
+- James says this needs to use an interface which would define the functions that each of these would use. I think this would be something like

@@ -1,0 +1,66 @@
+# Plan: ADHD Todo — Three Feature Additions
+
+## Context
+Three items from the project's `to-do.md`:
+1. Completed tasks should persist in a visible "Done" section
+2. Tasks and subtasks should support an optional description field
+3. All sections in the left sidebar (Level/XP bar, Categories) should be individually collapsible
+
+---
+
+## Feature 1: "Done" section in task list
+
+**What:** Completed tasks appear in a collapsible "Done" section at the bottom of the task list instead of disappearing.
+
+**How:**
+- `App.tsx`: Pass `includeComplete: true` to `useTasks()` — infrastructure already exists in DB/IPC/hook
+- `App.tsx`: Split `tasks` into `activeTasks` (incomplete) and `doneTasks` (complete) before passing to `TaskList`
+- `TaskList.tsx`: Accept separate `doneTasks` prop; render them below active tasks under a collapsible "Done (N)" header (local `useState` for collapsed)
+- Done tasks are read-only (no drag handles, no complete button — already complete); keep edit/delete actions
+- Done tasks show `completedAt` date instead of due date metadata
+
+**Files:** `src/renderer/src/App.tsx`, `src/renderer/src/components/tasks/TaskList.tsx`
+
+---
+
+## Feature 2: Descriptions on tasks and subtasks
+
+**What:** Optional freeform text description field on both tasks and subtasks.
+
+**How:**
+
+### DB + types
+- `migrations.ts`: Two new `ALTER TABLE … ADD COLUMN description TEXT` statements in `try/catch` blocks (matching existing xp_value pattern)
+- `types.ts`: Add `description: string | null` to `Task` and `Subtask`; update `CreateSubtaskPayload` to include optional `description`
+
+### Backend
+- `db/tasks.ts`: Add `description` to `SELECT`, `INSERT`, and `UPDATE` queries
+- `db/subtasks.ts`: Add `description` to `SELECT`, `INSERT` queries; add update support
+
+### Frontend
+- `TaskForm.tsx`: Add a `<textarea>` for description below the title field
+- `SubtaskList.tsx`: Expand subtask row to show/edit inline description (small italic line below title, click to edit)
+
+**Files:** `src/main/db/migrations.ts`, `src/shared/types.ts`, `src/main/db/tasks.ts`, `src/main/db/subtasks.ts`, `src/main/ipc/subtasks.ts`, `src/renderer/src/components/tasks/TaskForm.tsx`, `src/renderer/src/components/tasks/SubtaskList.tsx`
+
+---
+
+## Feature 3: Collapsible sidebar sections
+
+**What:** Level/XP bar and Categories nav each have a collapse toggle in their headers.
+
+**How:**
+- `Sidebar.tsx`: Add two `useState` booleans — `levelCollapsed` and `categoriesCollapsed`
+- XpBar section: wrap in a container with a clickable header row (`▼ Level` / `▶ Level`) that toggles `levelCollapsed`; conditionally render `<XpBar />`
+- Categories section: same pattern — clickable `▼ Categories` / `▶ Categories` header toggles `categoriesCollapsed`; conditionally render category list
+
+**Files:** `src/renderer/src/components/layout/Sidebar.tsx`
+
+---
+
+## Verification
+1. `npm run dev` — app launches
+2. Complete a task → it appears in "Done (1)" section at bottom; section collapses/expands on click
+3. Create/edit a task → description textarea is present; saved description appears in the task card when expanded (or always shown as secondary line)
+4. Add description to a subtask → inline description renders below subtask title
+5. Collapse/expand the Level bar and Categories sections in the sidebar

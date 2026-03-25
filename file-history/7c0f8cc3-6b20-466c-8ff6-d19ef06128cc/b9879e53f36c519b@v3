@@ -1,0 +1,112 @@
+// Typed wrappers around window.electron.ipcRenderer.invoke.
+// The renderer imports from here — never calls ipcRenderer directly.
+
+import { IPC } from '@shared/ipc-channels'
+import type {
+  Task,
+  Category,
+  CategoryWithCount,
+  Subtask,
+  CreateTaskPayload,
+  UpdateTaskPayload,
+  CreateCategoryPayload,
+  UpdateCategoryPayload,
+  CreateSubtaskPayload,
+  UpdateSubtaskPayload,
+  PomodoroSession,
+  CompleteTaskResult,
+  GamificationStats
+} from '@shared/types'
+
+const invoke = (channel: string, payload?: unknown) =>
+  window.electron.ipcRenderer.invoke(channel, payload)
+
+// ── Tasks ─────────────────────────────────────────────────────────────────────
+
+export const getAllTasks = (opts?: {
+  categoryId?: number
+  includeComplete?: boolean
+}): Promise<Task[]> => invoke(IPC.TASKS.GET_ALL, opts) as Promise<Task[]>
+
+export const getTaskById = (id: number): Promise<Task | null> =>
+  invoke(IPC.TASKS.GET_BY_ID, { id }) as Promise<Task | null>
+
+export const createTask = (payload: CreateTaskPayload): Promise<Task> =>
+  invoke(IPC.TASKS.CREATE, payload) as Promise<Task>
+
+export const updateTask = (payload: UpdateTaskPayload): Promise<Task> =>
+  invoke(IPC.TASKS.UPDATE, payload) as Promise<Task>
+
+export const deleteTask = (id: number): Promise<void> =>
+  invoke(IPC.TASKS.DELETE, { id }) as Promise<void>
+
+export const reorderTasks = (orderedIds: number[]): Promise<void> =>
+  invoke(IPC.TASKS.REORDER, { orderedIds }) as Promise<void>
+
+export const completeTask = (id: number): Promise<CompleteTaskResult> =>
+  invoke(IPC.TASKS.COMPLETE, { id }) as Promise<CompleteTaskResult>
+
+// ── Categories ────────────────────────────────────────────────────────────────
+
+export const getAllCategories = (): Promise<CategoryWithCount[]> =>
+  invoke(IPC.CATEGORIES.GET_ALL) as Promise<CategoryWithCount[]>
+
+export const createCategory = (payload: CreateCategoryPayload): Promise<Category> =>
+  invoke(IPC.CATEGORIES.CREATE, payload) as Promise<Category>
+
+export const updateCategory = (payload: UpdateCategoryPayload): Promise<Category> =>
+  invoke(IPC.CATEGORIES.UPDATE, payload) as Promise<Category>
+
+export const deleteCategory = (id: number): Promise<void> =>
+  invoke(IPC.CATEGORIES.DELETE, { id }) as Promise<void>
+
+// ── Subtasks ──────────────────────────────────────────────────────────────────
+
+export const getSubtasksByTask = (taskId: number): Promise<Subtask[]> =>
+  invoke(IPC.SUBTASKS.GET_BY_TASK, { taskId }) as Promise<Subtask[]>
+
+export const createSubtask = (payload: CreateSubtaskPayload): Promise<Subtask> =>
+  invoke(IPC.SUBTASKS.CREATE, payload) as Promise<Subtask>
+
+export const updateSubtask = (payload: UpdateSubtaskPayload): Promise<Subtask> =>
+  invoke(IPC.SUBTASKS.UPDATE, payload) as Promise<Subtask>
+
+export const deleteSubtask = (id: number): Promise<void> =>
+  invoke(IPC.SUBTASKS.DELETE, { id }) as Promise<void>
+
+export const reorderSubtasks = (taskId: number, orderedIds: number[]): Promise<void> =>
+  invoke(IPC.SUBTASKS.REORDER, { taskId, orderedIds }) as Promise<void>
+
+// ── Pomodoro ──────────────────────────────────────────────────────────────────
+
+export const startPomodoroSession = (payload: {
+  taskId?: number
+  phase: PomodoroSession['phase']
+  durationS: number
+}): Promise<{ sessionId: number }> =>
+  invoke(IPC.POMODORO.START_SESSION, payload) as Promise<{ sessionId: number }>
+
+export const completePomodoroSession = (sessionId: number): Promise<void> =>
+  invoke(IPC.POMODORO.COMPLETE_SESSION, { sessionId }) as Promise<void>
+
+// ── App ───────────────────────────────────────────────────────────────────────
+
+export const minimizeToTray = (): Promise<void> =>
+  invoke(IPC.APP.MINIMIZE_TO_TRAY) as Promise<void>
+export const quitApp = (): Promise<void> => invoke(IPC.APP.QUIT) as Promise<void>
+
+// ── Work Timer ────────────────────────────────────────────────────────────────
+
+export const startWorkSession = (): Promise<{ id: number; startedAt: string }> =>
+  invoke(IPC.WORK_TIMER.START) as Promise<{ id: number; startedAt: string }>
+
+export const stopWorkSession = (id: number): Promise<void> =>
+  invoke(IPC.WORK_TIMER.STOP, { id }) as Promise<void>
+
+export const getTodayWorkTotal = (): Promise<number> =>
+  invoke(IPC.WORK_TIMER.GET_TODAY_TOTAL) as Promise<number>
+
+// ── Gamification ──────────────────────────────────────────────────────────────
+
+export const getGamificationStats = (): Promise<GamificationStats> =>
+  invoke(IPC.GAMIFICATION.GET_STATS) as Promise<GamificationStats>

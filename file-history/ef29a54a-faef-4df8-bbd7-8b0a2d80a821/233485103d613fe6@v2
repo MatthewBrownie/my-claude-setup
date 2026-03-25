@@ -1,0 +1,16 @@
+import { ipcMain } from 'electron'
+import { IPC } from '@shared/ipc-channels'
+import type { PomodoroSession } from '@shared/types'
+import { getDb } from '../db'
+import * as db from '../db/pomodoro'
+
+export function registerPomodoroHandlers(): void {
+  ipcMain.handle(
+    IPC.POMODORO.START_SESSION,
+    (_e, payload: { taskId?: number; phase: PomodoroSession['phase']; durationS: number }) =>
+      db.startSession(getDb(), payload)
+  )
+  ipcMain.handle(IPC.POMODORO.COMPLETE_SESSION, (_e, { sessionId }) =>
+    db.completeSession(getDb(), sessionId)
+  )
+}

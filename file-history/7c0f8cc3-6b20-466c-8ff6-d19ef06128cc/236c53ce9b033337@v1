@@ -1,0 +1,123 @@
+import { useEffect, useCallback } from 'react'
+import { Sidebar } from '@renderer/components/layout/Sidebar'
+import { Header } from '@renderer/components/layout/Header'
+import { Before5pmBanner } from '@renderer/components/banner/Before5pmBanner'
+import { BrainDumpInput } from '@renderer/components/braindump/BrainDumpInput'
+import { TaskList } from '@renderer/components/tasks/TaskList'
+import { FocusMode } from '@renderer/components/focus/FocusMode'
+import { GamificationStub } from '@renderer/components/gamification/GamificationStub'
+import { useAppStore } from '@renderer/store/appStore'
+import { useCategories } from '@renderer/hooks/useCategories'
+import { useTasks } from '@renderer/hooks/useTasks'
+import { useUserStats } from '@renderer/hooks/useUserStats'
+
+export function App() {
+  const { activeCategoryId, focusMode, exitFocusMode } = useAppStore()
+
+  const { categories, refresh: refreshCategories, addCategory, editCategory, removeCategory } =
+    useCategories()
+
+  const {
+    tasks,
+    refresh: refreshTasks,
+    addTask,
+    editTask,
+    removeTask,
+    reorder,
+    markComplete
+  } = useTasks({ categoryId: activeCategoryId ?? undefined })
+
+  const { stats: gamificationStats, onTaskComplete } = useUserStats()
+
+  // Load initial data
+  useEffect(() => {
+    refreshCategories()
+    refreshTasks()
+  }, [])
+
+  // Re-fetch tasks when active category changes
+  useEffect(() => {
+    refreshTasks()
+  }, [activeCategoryId])
+
+  // Also refresh categories (for task counts) after task mutations
+  const handleAddTask = useCallback(
+    async (payload: Parameters<typeof addTask>[0]) => {
+      await addTask(payload)
+      await refreshCategories()
+    },
+    [addTask, refreshCategories]
+  )
+
+  const handleCompleteTask = useCallback(
+    async (id: number) => {
+      const result = await markComplete(id)
+      onTaskComplete(result)
+      await refreshCategories()
+    },
+    [markComplete, refreshCategories, onTaskComplete]
+  )
+
+  const handleDeleteTask = useCallback(
+    async (id: number) => {
+      await removeTask(id)
+      await refreshCategories()
+    },
+    [removeTask, refreshCategories]
+  )
+
+  // Escape exits focus mode
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && focusMode) exitFocusMode()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [focusMode, exitFocusMode])
+
+  const totalTaskCount = categories.reduce((sum, c) => sum + c.taskCount, 0)
+
+  return (
+    <div className="flex h-full bg-background">
+      {/* Always-visible sidebar */}
+      <Sidebar
+        categories={categories}
+        totalTaskCount={totalTaskCount}
+        gamificationStats={gamificationStats}
+        onAddCategory={addCategory}
+        onEditCategory={editCategory}
+        onDeleteCategory={removeCategory}
+      />
+
+      {/* Main area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <Header />
+
+        {/* Before 5PM banner — appears automatically when relevant tasks exist */}
+        <Before5pmBanner tasks={tasks} />
+
+        {/* Brain dump quick-add strip */}
+        <BrainDumpInput categories={categories} onAdd={handleAddTask} />
+
+        {/* Task list */}
+        <div className="flex-1 overflow-hidden">
+          <TaskList
+            tasks={tasks}
+            categories={categories}
+            onAddTask={handleAddTask}
+            onEditTask={editTask}
+            onDeleteTask={handleDeleteTask}
+            onCompleteTask={handleCompleteTask}
+            onReorder={reorder}
+          />
+        </div>
+      </div>
+
+      {/* Focus mode overlay — renders on top of everything */}
+      <FocusMode tasks={tasks} categories={categories} />
+
+      {/* Gamification placeholder */}
+      <GamificationStub />
+    </div>
+  )
+}

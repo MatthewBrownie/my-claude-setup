@@ -1,0 +1,80 @@
+# Plan: Work Timer ("On the Clock")
+
+## Context
+Users with ADHD suffer from time blindness — they step away briefly and lose an hour. A simple clock-in/clock-out toggle with a live elapsed timer and persisted daily totals gives concrete feedback about time actually worked. Historical data (time per day) is stored for future display.
+
+---
+
+## Database
+
+**New table: `work_sessions`**
+```sql
+CREATE TABLE IF NOT EXISTS work_sessions (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  date       TEXT    NOT NULL,              -- ISO date "YYYY-MM-DD"
+  started_at TEXT    NOT NULL,              -- ISO datetime
+  ended_at   TEXT                           -- NULL while session is active
+);
+CREATE INDEX IF NOT EXISTS idx_work_sessions_date ON work_sessions(date);
+```
+Added in `src/main/db/migrations.ts` (CREATE TABLE IF NOT EXISTS — safe to re-run).
+
+---
+
+## Backend
+
+**`src/main/db/workSessions.ts`** (new file)
+- `startSession(db)` — INSERT row with current datetime, return `{ id, startedAt }`
+- `endSession(db, id)` — UPDATE `ended_at = now` for the given id
+- `getTodayTotal(db)` — SELECT SUM of completed session durations for today's date; also add any active (unended) session up to now
+
+**`src/shared/ipc-channels.ts`** — add `WORK_TIMER` group:
+```ts
+WORK_TIMER: {
+  START:           'work-timer:start',
+  STOP:            'work-timer:stop',
+  GET_TODAY_TOTAL: 'work-timer:get-today-total',
+}
+```
+
+**`src/main/ipc/workTimer.ts`** (new file) — register handlers for the three channels.
+
+**`src/main/ipc/index.ts`** — call `registerWorkTimerHandlers()`.
+
+---
+
+## Frontend
+
+**`src/renderer/src/lib/ipc.ts`** — add three typed wrappers:
+- `startWorkSession(): Promise<{ id: number; startedAt: string }>`
+- `stopWorkSession(id: number): Promise<void>`
+- `getTodayWorkTotal(): Promise<number>` (total seconds)
+
+**`src/renderer/src/hooks/useWorkTimer.ts`** (new file)
+```ts
+{
+  isRunning: boolean
+  sessionSeconds: number   // live elapsed seconds for current session
+  todayTotalSeconds: number
+  toggle: () => void       // clock in / clock out
+}
+```
+- On mount: calls `getTodayWorkTotal()` to hydrate today's total
+- On clock-in: calls `startWorkSession()`, stores `sessionId`, starts a `setInterval` tick
+- On clock-out: calls `stopWorkSession(sessionId)`, clears interval, adds session to `todayTotalSeconds`
+
+**`src/renderer/src/components/clock/WorkTimer.tsx`** (new file)
+- A red pulsing circle button (Lucide `Circle` filled when on, outline when off)
+- Shows live elapsed `H:MM:SS` while running
+- Shows `Today: Xh Ym` below (from `todayTotalSeconds`)
+
+**`src/renderer/src/components/layout/Sidebar.tsx`** — render `<WorkTimer />` between the XP bar and the nav section (always visible when sidebar is open).
+
+---
+
+## Verification
+1. `npm run dev`
+2. Click the record button → turns red, timer ticks up
+3. Click again → timer stops, "Today: Xh Ym" updates
+4. Restart the app → "Today: Xh Ym" still shows the correct accumulated total
+5. Check SQLite: `work_sessions` table has rows with `started_at` and `ended_at`

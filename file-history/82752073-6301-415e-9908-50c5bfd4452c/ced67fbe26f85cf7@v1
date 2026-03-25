@@ -1,0 +1,39 @@
+import { useBefore5pm } from '@renderer/hooks/useBefore5pm'
+import { useLiveClock } from '@renderer/hooks/useLiveClock'
+import { formatSecondsLong } from '@renderer/lib/utils'
+import type { Task } from '@shared/types'
+import { AlertTriangle } from 'lucide-react'
+
+interface Before5pmBannerProps {
+  tasks: Task[]
+}
+
+export function Before5pmBanner({ tasks }: Before5pmBannerProps) {
+  const now = useLiveClock()
+  const { hasTasks, secondsRemaining, isOverdue } = useBefore5pm(tasks, now)
+
+  if (!hasTasks) return null
+
+  return (
+    <div
+      className={`
+        flex items-center gap-3 px-4 py-2.5 text-sm font-semibold
+        border-b-2 animate-pulse-border
+        ${isOverdue
+          ? 'bg-red-950/80 border-red-500 text-red-200'
+          : 'bg-amber-950/80 border-amber-500 text-amber-200'
+        }
+      `}
+    >
+      <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+      <span className="flex-1">
+        {isOverdue ? 'OVERDUE — tasks were due before 5 PM!' : 'DO BEFORE 5 PM'}
+      </span>
+      <span className="font-mono text-base tabular-nums">
+        {isOverdue
+          ? `${Math.abs(Math.floor(secondsRemaining / 60))}m overdue`
+          : formatSecondsLong(secondsRemaining)}
+      </span>
+    </div>
+  )
+}

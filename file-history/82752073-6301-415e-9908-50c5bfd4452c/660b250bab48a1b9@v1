@@ -1,0 +1,175 @@
+import type Database from 'better-sqlite3'
+import { addDays, addWeeks, addMonths, format } from 'date-fns'
+import type { Task, CreateTaskPayload, UpdateTaskPayload } from '@shared/types'
+
+function rowToTask(row: Record<string, unknown>): Task {
+  return {
+    id: row.id as number,
+    categoryId: row.category_id as number | null,
+    title: row.title as string,
+    description: (row.description as string | null) ?? null,
+    color: row.color as string | null,
+    dueDate: row.due_date as string | null,
+    dueBefore5pm: Boolean(row.due_before_5pm),
+    timeEstimateMins: row.time_estimate_mins as number | null,
+    sortOrder: row.sort_order as number,
+    isComplete: Boolean(row.is_complete),
+    completedAt: row.completed_at as string | null,
+    recurringPattern: (row.recurring_pattern as Task['recurringPattern']) ?? 'none',
+    recurringBaseId: row.recurring_base_id as number | null,
+    xpValue: (row.xp_value as number) ?? 10,
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string
+  }
+}
+
+export function getAllTasks(
+  db: Database.Database,
+  opts: { categoryId?: number; includeComplete?: boolean } = {}
+): Task[] {
+  const conditions: string[] = []
+  const params: unknown[] = []
+
+  if (!opts.includeComplete) {
+    conditions.push('is_complete = 0')
+  }
+  if (opts.categoryId !== undefined) {
+    conditions.push('category_id = ?')
+    params.push(opts.categoryId)
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+  const rows = db
+    .prepare(`SELECT * FROM tasks ${where} ORDER BY sort_order ASC, created_at ASC`)
+    .all(...params) as Record<string, unknown>[]
+
+  return rows.map(rowToTask)
+}
+
+export function getTaskById(db: Database.Database, id: number): Task | null {
+  const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as
+    | Record<string, unknown>
+    | undefined
+  return row ? rowToTask(row) : null
+}
+
+export function createTask(db: Database.Database, payload: CreateTaskPayload): Task {
+  const maxOrder = (
+    db.prepare('SELECT MAX(sort_order) AS m FROM tasks WHERE is_complete = 0').get() as {
+      m: number | null
+    }
+  ).m
+  const sortOrder = maxOrder != null ? maxOrder + 1 : 0
+
+  const result = db
+    .prepare(
+      `INSERT INTO tasks
+         (category_id, title, description, color, due_date, due_before_5pm, time_estimate_mins,
+          sort_order, is_complete, recurring_pattern, recurring_base_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .run(
+      payload.categoryId ?? null,
+      payload.title,
+      payload.description ?? null,
+      payload.color ?? null,
+      payload.dueDate ?? null,
+      payload.dueBefore5pm ? 1 : 0,
+      payload.timeEstimateMins ?? null,
+      sortOrder,
+      payload.isComplete ? 1 : 0,
+      payload.recurringPattern ?? 'none',
+      payload.recurringBaseId ?? null
+    )
+
+  return getTaskById(db, result.lastInsertRowid as number)!
+}
+
+export function updateTask(db: Database.Database, payload: UpdateTaskPayload): Task {
+  const fields: string[] = []
+  const values: unknown[] = []
+
+  const map: Record<string, string> = {
+    categoryId: 'category_id',
+    title: 'title',
+    description: 'description',
+    color: 'color',
+    dueDate: 'due_date',
+    dueBefore5pm: 'due_before_5pm',
+    timeEstimateMins: 'time_estimate_mins',
+    sortOrder: 'sort_order',
+    isComplete: 'is_complete',
+    completedAt: 'completed_at',
+    recurringPattern: 'recurring_pattern',
+    recurringBaseId: 'recurring_base_id'
+  }
+
+  for (const [key, col] of Object.entries(map)) {
+    if (key in payload && key !== 'id') {
+      fields.push(`${col} = ?`)
+      const val = payload[key as keyof UpdateTaskPayload]
+      // Convert booleans to 0/1 for SQLite
+      values.push(typeof val === 'boolean' ? (val ? 1 : 0) : val)
+    }
+  }
+
+  if (fields.length > 0) {
+    fields.push("updated_at = datetime('now')")
+    values.push(payload.id)
+    db.prepare(`UPDATE tasks SET ${fields.join(', ')} WHERE id = ?`).run(...values)
+  }
+
+  return getTaskById(db, payload.id)!
+}
+
+export function deleteTask(db: Database.Database, id: number): void {
+  db.prepare('DELETE FROM tasks WHERE id = ?').run(id)
+}
+
+/** Bulk-update sort_order based on an ordered array of IDs. */
+export function reorderTasks(db: Database.Database, orderedIds: number[]): void {
+  const stmt = db.prepare('UPDATE tasks SET sort_order = ? WHERE id = ?')
+  const bulk = db.transaction(() => {
+    orderedIds.forEach((id, index) => stmt.run(index, id))
+  })
+  bulk()
+}
+
+/**
+ * Mark a task complete. If it has a recurring pattern, generates the next occurrence.
+ * Returns the updated task.
+ */
+export function completeTask(db: Database.Database, id: number): Task {
+  const now = new Date().toISOString()
+  db.prepare(
+    `UPDATE tasks SET is_complete = 1, completed_at = ?, updated_at = datetime('now') WHERE id = ?`
+  ).run(now, id)
+
+  const task = getTaskById(db, id)!
+
+  // Spawn next recurrence if applicable
+  if (task.recurringPattern !== 'none' && task.dueDate) {
+    const base = new Date(task.dueDate)
+    let nextDate: Date
+    if (task.recurringPattern === 'daily') nextDate = addDays(base, 1)
+    else if (task.recurringPattern === 'weekly') nextDate = addWeeks(base, 1)
+    else nextDate = addMonths(base, 1)
+
+    createTask(db, {
+      categoryId: task.categoryId,
+      title: task.title,
+      description: task.description,
+      color: task.color,
+      dueDate: format(nextDate, 'yyyy-MM-dd'),
+      dueBefore5pm: task.dueBefore5pm,
+      timeEstimateMins: task.timeEstimateMins,
+      sortOrder: task.sortOrder,
+      isComplete: false,
+      recurringPattern: task.recurringPattern,
+      recurringBaseId: task.recurringBaseId ?? id,
+      xpValue: task.xpValue
+    })
+  }
+
+  return task
+}

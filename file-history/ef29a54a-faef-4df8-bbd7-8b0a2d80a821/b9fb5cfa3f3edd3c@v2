@@ -1,0 +1,15 @@
+// TODO: Gamification features will be implemented here.
+// A research agent has been run to gather ADHD-specific gamification patterns.
+// See project memory for findings and implementation plan.
+//
+// Planned features (from research agent):
+//   - XP / points for completing tasks and pomodoro sessions
+//   - Streaks (with grace days to avoid shame spirals)
+//   - Achievement badges
+//   - Visual level/progress indicator
+//
+// Data is already being collected in the `pomodoro_sessions` table.
+
+export function GamificationStub() {
+  return null
+}

@@ -1,0 +1,55 @@
+import { useState, useCallback, useEffect, useRef } from 'react'
+import type { GamificationStats, CompleteTaskResult } from '@shared/types'
+import * as ipc from '@renderer/lib/ipc'
+
+interface UserStatsState extends GamificationStats {
+  xpGained: number  // non-zero briefly after a task completion, used for the "+XP" animation
+}
+
+const DEFAULT_STATS: UserStatsState = {
+  totalXp: 0,
+  level: 1,
+  todayPomodoros: 0,
+  updatedAt: '',
+  xpGained: 0
+}
+
+export function useUserStats() {
+  const [stats, setStats] = useState<UserStatsState>(DEFAULT_STATS)
+  const xpClearTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const refresh = useCallback(async () => {
+    const fresh = await ipc.getGamificationStats()
+    setStats((prev) => ({ ...prev, ...fresh, xpGained: prev.xpGained }))
+  }, [])
+
+  // Load on mount
+  useEffect(() => {
+    refresh()
+  }, [])
+
+  /**
+   * Called immediately after a task is completed.
+   * Updates stats and sets xpGained so the "+XP" float animation fires.
+   * xpGained auto-clears after 2 seconds.
+   */
+  const onTaskComplete = useCallback((result: CompleteTaskResult) => {
+    setStats({
+      ...result.stats,
+      xpGained: result.xpGained
+    })
+
+    // Clear the "+XP" indicator after the animation finishes
+    if (xpClearTimer.current) clearTimeout(xpClearTimer.current)
+    xpClearTimer.current = setTimeout(() => {
+      setStats((prev) => ({ ...prev, xpGained: 0 }))
+    }, 2000)
+  }, [])
+
+  // Also refresh after a Pomodoro completes (so today's counter updates)
+  const onPomodoroComplete = useCallback(() => {
+    refresh()
+  }, [refresh])
+
+  return { stats, refresh, onTaskComplete, onPomodoroComplete }
+}

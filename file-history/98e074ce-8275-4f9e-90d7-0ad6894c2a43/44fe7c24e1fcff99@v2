@@ -1,0 +1,39 @@
+# Plan: Git Setup + Skill Migration
+
+## Context
+Setting up `~/.claude` as a private git repo synced between desktop and laptop. Two tasks:
+1. Create `.gitignore` to exclude sensitive/machine-specific files
+2. Copy two project skills from `gpsl-cp-system` into the global skills directory
+
+---
+
+## Task 1: Create `.gitignore`
+
+**File:** `C:\Users\mbrow\.claude\.gitignore`
+
+```
+.credentials.json
+history.jsonl
+cache/
+sessions/
+shell-snapshots/
+```
+
+---
+
+## Task 2: Copy Skills
+
+Copy these two files from `C:\Users\mbrow\git\gpsl-cp-system\.claude\skills\` into `C:\Users\mbrow\.claude\skills\`:
+
+- `neo4j-query.md` → `C:\Users\mbrow\.claude\skills\neo4j-query.md`
+- `postgres-query.md` → `C:\Users\mbrow\.claude\skills\postgres-query.md`
+
+**Note:** These skills are project-specific (gpsl-cp-system schema). Moving them global means they'll surface in all projects. This is fine if you use those DBs elsewhere, but worth knowing.
+
+**Note:** These files lack YAML frontmatter (unlike `nano-banana/SKILL.md`). They'll still work but may not auto-trigger as reliably. Happy to add frontmatter if you'd like.
+
+---
+
+## Verification
+- Confirm `.gitignore` excludes the right paths with `git status` after init
+- Confirm skills appear under `~/.claude/skills/`

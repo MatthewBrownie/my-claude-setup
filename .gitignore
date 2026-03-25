@@ -1,0 +1,5 @@
+.credentials.json
+history.jsonl
+cache/
+sessions/
+shell-snapshots/

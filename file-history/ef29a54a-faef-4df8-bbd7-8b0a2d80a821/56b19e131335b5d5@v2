@@ -1,0 +1,80 @@
+import type Database from 'better-sqlite3'
+import type {
+  Category,
+  CategoryWithCount,
+  CreateCategoryPayload,
+  UpdateCategoryPayload
+} from '@shared/types'
+
+/** Maps a raw DB row (snake_case) to the Category interface (camelCase). */
+function rowToCategory(row: Record<string, unknown>): Category {
+  return {
+    id: row.id as number,
+    name: row.name as string,
+    color: row.color as string,
+    sortOrder: row.sort_order as number,
+    createdAt: row.created_at as string
+  }
+}
+
+export function getAllCategories(db: Database.Database): CategoryWithCount[] {
+  const rows = db
+    .prepare(
+      `SELECT c.*, COUNT(CASE WHEN t.is_complete = 0 THEN 1 END) AS task_count
+       FROM categories c
+       LEFT JOIN tasks t ON t.category_id = c.id
+       GROUP BY c.id
+       ORDER BY c.sort_order ASC, c.name ASC`
+    )
+    .all() as Record<string, unknown>[]
+
+  return rows.map((row) => ({
+    ...rowToCategory(row),
+    taskCount: row.task_count as number
+  }))
+}
+
+export function createCategory(db: Database.Database, payload: CreateCategoryPayload): Category {
+  const maxOrder = (
+    db.prepare('SELECT MAX(sort_order) AS m FROM categories').get() as { m: number | null }
+  ).m
+  const sortOrder = maxOrder != null ? maxOrder + 1 : 0
+
+  const result = db
+    .prepare('INSERT INTO categories (name, color, sort_order) VALUES (?, ?, ?)')
+    .run(payload.name, payload.color, sortOrder)
+
+  return db
+    .prepare('SELECT * FROM categories WHERE id = ?')
+    .get(result.lastInsertRowid) as Category
+}
+
+export function updateCategory(db: Database.Database, payload: UpdateCategoryPayload): Category {
+  const fields: string[] = []
+  const values: unknown[] = []
+
+  if (payload.name !== undefined) {
+    fields.push('name = ?')
+    values.push(payload.name)
+  }
+  if (payload.color !== undefined) {
+    fields.push('color = ?')
+    values.push(payload.color)
+  }
+
+  if (fields.length > 0) {
+    values.push(payload.id)
+    db.prepare(`UPDATE categories SET ${fields.join(', ')} WHERE id = ?`).run(...values)
+  }
+
+  const row = db.prepare('SELECT * FROM categories WHERE id = ?').get(payload.id) as Record<
+    string,
+    unknown
+  >
+  return rowToCategory(row)
+}
+
+export function deleteCategory(db: Database.Database, id: number): void {
+  // Tasks referencing this category will have category_id set to NULL (ON DELETE SET NULL)
+  db.prepare('DELETE FROM categories WHERE id = ?').run(id)
+}

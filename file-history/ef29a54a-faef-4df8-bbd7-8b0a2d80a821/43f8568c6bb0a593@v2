@@ -1,0 +1,16 @@
+import { ipcMain } from 'electron'
+import { IPC } from '@shared/ipc-channels'
+import type { CreateCategoryPayload, UpdateCategoryPayload } from '@shared/types'
+import { getDb } from '../db'
+import * as db from '../db/categories'
+
+export function registerCategoryHandlers(): void {
+  ipcMain.handle(IPC.CATEGORIES.GET_ALL, () => db.getAllCategories(getDb()))
+  ipcMain.handle(IPC.CATEGORIES.CREATE, (_e, payload: CreateCategoryPayload) =>
+    db.createCategory(getDb(), payload)
+  )
+  ipcMain.handle(IPC.CATEGORIES.UPDATE, (_e, payload: UpdateCategoryPayload) =>
+    db.updateCategory(getDb(), payload)
+  )
+  ipcMain.handle(IPC.CATEGORIES.DELETE, (_e, { id }) => db.deleteCategory(getDb(), id))
+}

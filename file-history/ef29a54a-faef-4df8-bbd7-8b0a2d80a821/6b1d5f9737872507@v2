@@ -1,0 +1,41 @@
+import { LiveClock } from '@renderer/components/clock/LiveClock'
+import { useAppStore } from '@renderer/store/appStore'
+import { Zap, Minimize2 } from 'lucide-react'
+import { cn } from '@renderer/lib/utils'
+import { minimizeToTray } from '@renderer/lib/ipc'
+
+export function Header() {
+  const { toggleBrainDump, brainDumpOpen } = useAppStore()
+
+  return (
+    <header className="flex items-center gap-4 px-5 py-3 border-b border-border bg-card/50 flex-shrink-0">
+      <LiveClock className="flex-1" />
+
+      <div className="flex items-center gap-2">
+        {/* Brain dump toggle */}
+        <button
+          onClick={toggleBrainDump}
+          title="Quick add task (Ctrl+Space)"
+          className={cn(
+            'flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors',
+            brainDumpOpen
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-muted text-muted-foreground hover:text-foreground'
+          )}
+        >
+          <Zap className="h-3.5 w-3.5" />
+          Brain Dump
+        </button>
+
+        {/* Minimize to tray */}
+        <button
+          onClick={() => minimizeToTray()}
+          title="Minimize to tray"
+          className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        >
+          <Minimize2 className="h-4 w-4" />
+        </button>
+      </div>
+    </header>
+  )
+}

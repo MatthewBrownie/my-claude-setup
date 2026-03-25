@@ -1,0 +1,106 @@
+import { usePomodoro } from '@renderer/hooks/usePomodoro'
+import { formatCountdownSeconds } from '@renderer/lib/utils'
+import { Play, Pause, RotateCcw } from 'lucide-react'
+
+interface PomodoroTimerProps {
+  taskId?: number
+}
+
+const PHASE_LABELS = {
+  idle: 'Ready to focus',
+  work: 'Focus time',
+  short_break: 'Short break',
+  long_break: 'Long break'
+}
+
+const PHASE_COLORS = {
+  idle: '#6366f1',
+  work: '#6366f1',
+  short_break: '#22c55e',
+  long_break: '#14b8a6'
+}
+
+export function PomodoroTimer({ taskId }: PomodoroTimerProps) {
+  const [state, controls] = usePomodoro()
+
+  const { phase, remainingS, totalS, isRunning, completedSessions } = state
+  const progress = totalS > 0 ? (totalS - remainingS) / totalS : 0
+  const color = PHASE_COLORS[phase]
+
+  // SVG arc calculation
+  const radius = 54
+  const circumference = 2 * Math.PI * radius
+  const dashOffset = circumference * (1 - progress)
+
+  // Which of the 4 session dots are filled
+  const sessionDots = Array.from({ length: 4 }, (_, i) => i < completedSessions % 4)
+
+  return (
+    <div className="flex flex-col items-center gap-6 py-8">
+      <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+        {PHASE_LABELS[phase]}
+      </p>
+
+      {/* SVG circle progress */}
+      <div className="relative flex items-center justify-center">
+        <svg width="140" height="140" className="-rotate-90">
+          {/* Track */}
+          <circle cx="70" cy="70" r={radius} fill="none" stroke="hsl(var(--muted))" strokeWidth="8" />
+          {/* Progress arc */}
+          <circle
+            cx="70"
+            cy="70"
+            r={radius}
+            fill="none"
+            stroke={color}
+            strokeWidth="8"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={dashOffset}
+            style={{ transition: 'stroke-dashoffset 1s linear' }}
+          />
+        </svg>
+        {/* Time in center */}
+        <div className="absolute flex flex-col items-center">
+          <span className="font-mono text-3xl font-bold text-foreground tabular-nums">
+            {formatCountdownSeconds(remainingS)}
+          </span>
+        </div>
+      </div>
+
+      {/* Session dots — 4 circles tracking position in cycle */}
+      <div className="flex gap-2">
+        {sessionDots.map((filled, i) => (
+          <div
+            key={i}
+            className="w-2.5 h-2.5 rounded-full border transition-colors"
+            style={{
+              backgroundColor: filled ? color : 'transparent',
+              borderColor: color
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Controls */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => controls.reset()}
+          className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          title="Reset"
+        >
+          <RotateCcw className="h-4 w-4" />
+        </button>
+
+        <button
+          onClick={() => (isRunning ? controls.stop() : controls.start(taskId))}
+          className="flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-colors"
+          style={{ backgroundColor: color, color: 'white' }}
+        >
+          {isRunning ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          {isRunning ? 'Pause' : phase === 'idle' ? 'Start' : 'Resume'}
+        </button>
+      </div>
+    </div>
+  )
+}

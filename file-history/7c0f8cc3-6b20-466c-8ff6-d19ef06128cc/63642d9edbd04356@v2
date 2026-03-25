@@ -1,0 +1,36 @@
+import { useState, useCallback } from 'react'
+import type { Subtask, UpdateSubtaskPayload } from '@shared/types'
+import * as ipc from '@renderer/lib/ipc'
+
+export function useSubtasks(taskId: number) {
+  const [subtasks, setSubtasks] = useState<Subtask[]>([])
+
+  const refresh = useCallback(async () => {
+    setSubtasks(await ipc.getSubtasksByTask(taskId))
+  }, [taskId])
+
+  const add = useCallback(
+    async (title: string) => {
+      const s = await ipc.createSubtask({ taskId, title })
+      setSubtasks((prev) => [...prev, s])
+    },
+    [taskId]
+  )
+
+  const update = useCallback(async (payload: UpdateSubtaskPayload) => {
+    const updated = await ipc.updateSubtask(payload)
+    setSubtasks((prev) => prev.map((s) => (s.id === updated.id ? updated : s)))
+  }, [])
+
+  const toggle = useCallback(async (id: number, isComplete: boolean) => {
+    const updated = await ipc.updateSubtask({ id, isComplete })
+    setSubtasks((prev) => prev.map((s) => (s.id === id ? updated : s)))
+  }, [])
+
+  const remove = useCallback(async (id: number) => {
+    await ipc.deleteSubtask(id)
+    setSubtasks((prev) => prev.filter((s) => s.id !== id))
+  }, [])
+
+  return { subtasks, refresh, add, update, toggle, remove }
+}

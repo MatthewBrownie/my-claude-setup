@@ -1,0 +1,79 @@
+import type Database from 'better-sqlite3'
+import type { Subtask, CreateSubtaskPayload, UpdateSubtaskPayload } from '@shared/types'
+
+function rowToSubtask(row: Record<string, unknown>): Subtask {
+  return {
+    id: row.id as number,
+    taskId: row.task_id as number,
+    title: row.title as string,
+    description: (row.description as string | null) ?? null,
+    isComplete: Boolean(row.is_complete),
+    sortOrder: row.sort_order as number,
+    createdAt: row.created_at as string
+  }
+}
+
+export function getSubtasksByTask(db: Database.Database, taskId: number): Subtask[] {
+  const rows = db
+    .prepare('SELECT * FROM subtasks WHERE task_id = ? ORDER BY sort_order ASC, created_at ASC')
+    .all(taskId) as Record<string, unknown>[]
+  return rows.map(rowToSubtask)
+}
+
+export function createSubtask(db: Database.Database, payload: CreateSubtaskPayload): Subtask {
+  const maxOrder = (
+    db
+      .prepare('SELECT MAX(sort_order) AS m FROM subtasks WHERE task_id = ?')
+      .get(payload.taskId) as { m: number | null }
+  ).m
+  const sortOrder = maxOrder != null ? maxOrder + 1 : 0
+
+  const result = db
+    .prepare('INSERT INTO subtasks (task_id, title, description, sort_order) VALUES (?, ?, ?, ?)')
+    .run(payload.taskId, payload.title, payload.description ?? null, sortOrder)
+
+  const row = db
+    .prepare('SELECT * FROM subtasks WHERE id = ?')
+    .get(result.lastInsertRowid) as Record<string, unknown>
+  return rowToSubtask(row)
+}
+
+export function updateSubtask(db: Database.Database, payload: UpdateSubtaskPayload): Subtask {
+  const fields: string[] = []
+  const values: unknown[] = []
+
+  if (payload.title !== undefined) {
+    fields.push('title = ?')
+    values.push(payload.title)
+  }
+  if (payload.description !== undefined) {
+    fields.push('description = ?')
+    values.push(payload.description)
+  }
+  if (payload.isComplete !== undefined) {
+    fields.push('is_complete = ?')
+    values.push(payload.isComplete ? 1 : 0)
+  }
+
+  if (fields.length > 0) {
+    values.push(payload.id)
+    db.prepare(`UPDATE subtasks SET ${fields.join(', ')} WHERE id = ?`).run(...values)
+  }
+
+  const row = db
+    .prepare('SELECT * FROM subtasks WHERE id = ?')
+    .get(payload.id) as Record<string, unknown>
+  return rowToSubtask(row)
+}
+
+export function deleteSubtask(db: Database.Database, id: number): void {
+  db.prepare('DELETE FROM subtasks WHERE id = ?').run(id)
+}
+
+export function reorderSubtasks(db: Database.Database, orderedIds: number[]): void {
+  const stmt = db.prepare('UPDATE subtasks SET sort_order = ? WHERE id = ?')
+  const bulk = db.transaction(() => {
+    orderedIds.forEach((id, index) => stmt.run(index, id))
+  })
+  bulk()
+}

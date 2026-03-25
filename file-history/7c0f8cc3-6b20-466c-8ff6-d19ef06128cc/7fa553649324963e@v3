@@ -1,0 +1,220 @@
+import { useState } from 'react'
+import type { Task, CategoryWithCount, CreateTaskPayload, UpdateTaskPayload } from '@shared/types'
+import { SubtaskList } from './SubtaskList'
+import { TaskForm } from './TaskForm'
+import { RecurringBadge } from './RecurringBadge'
+import { useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { format, isToday, isPast, parseISO } from 'date-fns'
+import { formatMinutes } from '@renderer/lib/utils'
+import { useAppStore } from '@renderer/store/appStore'
+import {
+  CheckSquare,
+  Square,
+  ChevronDown,
+  ChevronRight,
+  GripVertical,
+  Pencil,
+  Trash2,
+  Focus,
+  Clock,
+  AlertCircle
+} from 'lucide-react'
+import { cn } from '@renderer/lib/utils'
+
+interface TaskCardProps {
+  task: Task
+  categories: CategoryWithCount[]
+  onComplete: (id: number) => Promise<void>
+  onEdit: (payload: UpdateTaskPayload) => Promise<Task>
+  onDelete: (id: number) => Promise<void>
+  /** When true, hides the drag handle and complete button (used for the Done section). */
+  readOnly?: boolean
+}
+
+export function TaskCard({ task, categories, onComplete, onEdit, onDelete, readOnly }: TaskCardProps) {
+  const [expanded, setExpanded] = useState(false)
+  const [showForm, setShowForm] = useState(false)
+  const [completing, setCompleting] = useState(false)
+  const { enterFocusMode } = useAppStore()
+
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: task.id
+  })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1
+  }
+
+  // Determine due date display color
+  const dueDateEl = (() => {
+    if (!task.dueDate) return null
+    const d = parseISO(task.dueDate)
+    const isOverdue = isPast(d) && !isToday(d)
+    const label = isToday(d) ? 'Today' : format(d, 'MMM d')
+    return (
+      <span
+        className={cn(
+          'inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded',
+          isOverdue
+            ? 'bg-red-950 text-red-400'
+            : isToday(d)
+              ? 'bg-amber-950 text-amber-400'
+              : 'bg-muted text-muted-foreground'
+        )}
+      >
+        {isOverdue && <AlertCircle className="h-2.5 w-2.5" />}
+        {label}
+      </span>
+    )
+  })()
+
+  const category = categories.find((c) => c.id === task.categoryId)
+  const cardColor = task.color ?? category?.color
+
+  return (
+    <>
+      <div
+        ref={setNodeRef}
+        style={style}
+        className={cn(
+          'group relative bg-card border border-border rounded-md overflow-hidden transition-shadow hover:shadow-md',
+          isDragging && 'shadow-lg',
+          completing && 'animate-task-complete pointer-events-none'
+        )}
+      >
+        {/* Left color bar */}
+        {cardColor && (
+          <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: cardColor }} />
+        )}
+
+        <div className={cn('flex items-start gap-2 px-3 py-2.5', cardColor && 'pl-4')}>
+          {/* Drag handle — hidden in readOnly mode */}
+          {!readOnly && (
+            <div
+              {...attributes}
+              {...listeners}
+              className="flex-shrink-0 mt-0.5 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none"
+            >
+              <GripVertical className="h-4 w-4" />
+            </div>
+          )}
+
+          {/* Complete checkbox / done indicator */}
+          {readOnly ? (
+            <CheckSquare className="flex-shrink-0 mt-0.5 h-4 w-4 text-primary" />
+          ) : (
+            <button
+              onClick={async () => {
+                if (completing) return
+                setCompleting(true)
+                // Let the animation play before the card is removed from the list
+                await new Promise((r) => setTimeout(r, 500))
+                await onComplete(task.id)
+              }}
+              className="flex-shrink-0 mt-0.5 text-muted-foreground hover:text-primary transition-colors"
+            >
+              {completing ? (
+                <CheckSquare className="h-4 w-4 text-primary" />
+              ) : (
+                <Square className="h-4 w-4" />
+              )}
+            </button>
+          )}
+
+          {/* Main content */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start gap-2">
+              <span className="flex-1 text-sm text-foreground leading-tight break-words">
+                {task.title}
+              </span>
+              {task.dueBefore5pm && (
+                <span className="flex-shrink-0 text-[10px] font-bold text-amber-400 bg-amber-950 px-1.5 py-0.5 rounded">
+                  ≤5PM
+                </span>
+              )}
+            </div>
+
+            {/* Metadata row */}
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              {dueDateEl}
+              {task.timeEstimateMins != null && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                  <Clock className="h-2.5 w-2.5" />
+                  {formatMinutes(task.timeEstimateMins)}
+                </span>
+              )}
+              <RecurringBadge pattern={task.recurringPattern} />
+              {category && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                  <span
+                    className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: category.color }}
+                  />
+                  {category.name}
+                </span>
+              )}
+            </div>
+
+            {/* Description + subtask list (expanded) */}
+            {expanded && (
+              <>
+                {task.description && (
+                  <p className="mt-2 text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                    {task.description}
+                  </p>
+                )}
+                <SubtaskList taskId={task.id} />
+              </>
+            )}
+          </div>
+
+          {/* Right-side action buttons */}
+          <div className="flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={() => setExpanded((v) => !v)}
+              title="Toggle details"
+              className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            </button>
+            {!readOnly && (
+              <button
+                onClick={() => enterFocusMode(task.id)}
+                title="Focus on this task"
+                className="p-1 rounded text-muted-foreground hover:text-primary hover:bg-muted transition-colors"
+              >
+                <Focus className="h-3.5 w-3.5" />
+              </button>
+            )}
+            <button
+              onClick={() => setShowForm(true)}
+              title="Edit task"
+              className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => onDelete(task.id)}
+              title="Delete task"
+              className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-muted transition-colors"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {showForm && (
+        <TaskForm
+          initial={task}
+          categories={categories}
+          onSave={onEdit as unknown as (payload: CreateTaskPayload | UpdateTaskPayload) => Promise<void>}
+          onClose={() => setShowForm(false)}
+        />
+      )}
+    </>
+  )
+}

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/mbrow/**)",
+      "Bash(find /c/Users/mbrow/.claude/plugins/ -name *.md)",
+      "WebSearch",
+      "Bash(gemini:*)",
+      "Bash(mkdir -p /c/Users/mbrow/.claude/function-diagram-output)",
+      "Bash(echo 'digraph G {:*)",
+      "Bash(dot -Tpng -o /c/Users/mbrow/.claude/function-diagram-output/addDocument.png)"
+    ]
+  }
+}

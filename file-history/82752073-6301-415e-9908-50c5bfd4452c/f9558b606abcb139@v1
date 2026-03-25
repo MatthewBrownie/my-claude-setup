@@ -1,0 +1,23 @@
+import { useMemo } from 'react'
+import { setHours, setMinutes, setSeconds, differenceInSeconds } from 'date-fns'
+import type { Task } from '@shared/types'
+
+interface Before5pmState {
+  hasTasks: boolean       // any incomplete due-before-5pm tasks exist
+  secondsRemaining: number // seconds until 5pm (negative = overdue)
+  isOverdue: boolean
+}
+
+export function useBefore5pm(tasks: Task[], now: Date): Before5pmState {
+  return useMemo(() => {
+    const pending = tasks.filter((t) => t.dueBefore5pm && !t.isComplete)
+    const target = setSeconds(setMinutes(setHours(now, 17), 0), 0)
+    const secondsRemaining = differenceInSeconds(target, now)
+
+    return {
+      hasTasks: pending.length > 0,
+      secondsRemaining,
+      isOverdue: secondsRemaining < 0
+    }
+  }, [tasks, now])
+}

@@ -1,0 +1,93 @@
+import { useState } from 'react'
+import type { CategoryWithCount, CreateCategoryPayload, UpdateCategoryPayload, GamificationStats } from '@shared/types'
+import { CategoryItem } from '@renderer/components/categories/CategoryItem'
+import { CategoryForm } from '@renderer/components/categories/CategoryForm'
+import { XpBar } from '@renderer/components/gamification/XpBar'
+import { useAppStore } from '@renderer/store/appStore'
+import { Plus, LayoutList } from 'lucide-react'
+import { cn } from '@renderer/lib/utils'
+
+interface SidebarProps {
+  categories: CategoryWithCount[]
+  totalTaskCount: number
+  gamificationStats: GamificationStats & { xpGained: number }
+  onAddCategory: (payload: CreateCategoryPayload) => Promise<void>
+  onEditCategory: (payload: UpdateCategoryPayload) => Promise<void>
+  onDeleteCategory: (id: number) => Promise<void>
+}
+
+export function Sidebar({
+  categories,
+  totalTaskCount,
+  gamificationStats,
+  onAddCategory,
+  onEditCategory,
+  onDeleteCategory
+}: SidebarProps) {
+  const { activeCategoryId, setActiveCategoryId } = useAppStore()
+  const [showAddForm, setShowAddForm] = useState(false)
+
+  return (
+    <aside className="w-56 flex-shrink-0 bg-card border-r border-border flex flex-col h-full">
+      <div className="px-3 py-4 border-b border-border">
+        <h1 className="text-sm font-bold text-foreground tracking-wider uppercase">ADHD Todo</h1>
+      </div>
+
+      {/* XP / level bar — always visible */}
+      <XpBar stats={gamificationStats} />
+
+      <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
+        {/* "All Tasks" entry — always at top */}
+        <div
+          className={cn(
+            'flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors',
+            activeCategoryId === null
+              ? 'bg-accent text-foreground'
+              : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+          )}
+          onClick={() => setActiveCategoryId(null)}
+        >
+          <LayoutList className="h-3.5 w-3.5 flex-shrink-0" />
+          <span className="flex-1 text-sm">All Tasks</span>
+          {totalTaskCount > 0 && (
+            <span className="text-xs bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 font-mono">
+              {totalTaskCount}
+            </span>
+          )}
+        </div>
+
+        {/* Category list — always fully visible (never collapsed) */}
+        <div className="pt-2">
+          <p className="px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+            Categories
+          </p>
+          {categories.map((cat) => (
+            <CategoryItem
+              key={cat.id}
+              category={cat}
+              isActive={activeCategoryId === cat.id}
+              onSelect={() => setActiveCategoryId(cat.id)}
+              onEdit={onEditCategory}
+              onDelete={onDeleteCategory}
+            />
+          ))}
+        </div>
+      </nav>
+
+      {/* Add category button — always visible at bottom */}
+      <div className="px-2 py-3 border-t border-border">
+        <button
+          onClick={() => setShowAddForm(true)}
+          className="flex items-center gap-2 w-full px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Add category
+        </button>
+      </div>
+
+      {showAddForm && (
+        <CategoryForm onSave={onAddCategory} onClose={() => setShowAddForm(false)} />
+      )}
+    </aside>
+  )
+}

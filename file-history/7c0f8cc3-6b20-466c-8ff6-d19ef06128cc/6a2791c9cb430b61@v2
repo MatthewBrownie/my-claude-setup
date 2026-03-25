@@ -1,0 +1,27 @@
+import { ipcMain } from 'electron'
+import { IPC } from '@shared/ipc-channels'
+import type { CreateTaskPayload, UpdateTaskPayload } from '@shared/types'
+import { getDb } from '../db'
+import * as db from '../db/tasks'
+import { addXp, getTodayPomodoroCount } from '../db/gamification'
+
+export function registerTaskHandlers(): void {
+  ipcMain.handle(IPC.TASKS.GET_ALL, (_e, opts) => db.getAllTasks(getDb(), opts))
+  ipcMain.handle(IPC.TASKS.GET_BY_ID, (_e, { id }) => db.getTaskById(getDb(), id))
+  ipcMain.handle(IPC.TASKS.CREATE, (_e, payload: CreateTaskPayload) =>
+    db.createTask(getDb(), payload)
+  )
+  ipcMain.handle(IPC.TASKS.UPDATE, (_e, payload: UpdateTaskPayload) =>
+    db.updateTask(getDb(), payload)
+  )
+  ipcMain.handle(IPC.TASKS.DELETE, (_e, { id }) => db.deleteTask(getDb(), id))
+  ipcMain.handle(IPC.TASKS.REORDER, (_e, { orderedIds }) => db.reorderTasks(getDb(), orderedIds))
+  ipcMain.handle(IPC.TASKS.COMPLETE, (_e, { id }) => {
+    const database = getDb()
+    const task = db.completeTask(database, id)
+    const xpGained = task.xpValue
+    const stats = addXp(database, xpGained)
+    const todayPomodoros = getTodayPomodoroCount(database)
+    return { task, xpGained, stats: { ...stats, todayPomodoros } }
+  })
+}

@@ -1,0 +1,63 @@
+// Domain types shared between the main process and renderer.
+// All datetimes are ISO 8601 strings (SQLite has no native datetime).
+
+export type RecurringPattern = 'none' | 'daily' | 'weekly' | 'monthly'
+
+export interface Category {
+  id: number
+  name: string
+  color: string // hex e.g. "#6366f1"
+  sortOrder: number
+  createdAt: string
+}
+
+export interface CategoryWithCount extends Category {
+  taskCount: number
+}
+
+export interface Task {
+  id: number
+  categoryId: number | null
+  title: string
+  color: string | null // per-task color override
+  dueDate: string | null // ISO date e.g. "2024-03-15"
+  dueBefore5pm: boolean
+  timeEstimateMins: number | null
+  sortOrder: number
+  isComplete: boolean
+  completedAt: string | null
+  recurringPattern: RecurringPattern
+  recurringBaseId: number | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Subtask {
+  id: number
+  taskId: number
+  title: string
+  isComplete: boolean
+  sortOrder: number
+  createdAt: string
+}
+
+export interface PomodoroSession {
+  id: number
+  taskId: number | null
+  phase: 'work' | 'short_break' | 'long_break'
+  durationS: number
+  startedAt: string
+  completedAt: string | null
+  wasCompleted: boolean
+}
+
+// IPC payload types
+
+export type CreateTaskPayload = Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'completedAt'>
+export type UpdateTaskPayload = { id: number } & Partial<Omit<Task, 'id' | 'createdAt'>>
+
+export type CreateCategoryPayload = { name: string; color: string }
+export type UpdateCategoryPayload = { id: number; name?: string; color?: string }
+
+export type CreateSubtaskPayload = { taskId: number; title: string }
+export type UpdateSubtaskPayload = { id: number; title?: string; isComplete?: boolean }

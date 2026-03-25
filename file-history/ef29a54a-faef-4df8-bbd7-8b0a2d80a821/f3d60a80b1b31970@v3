@@ -1,0 +1,90 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Dark mode CSS variables — always dark, no toggle */
+  :root,
+  .dark {
+    --background: 240 10% 4%;
+    --foreground: 0 0% 95%;
+    --card: 240 6% 10%;
+    --card-foreground: 0 0% 95%;
+    --border: 240 4% 20%;
+    --input: 240 4% 16%;
+    --ring: 263 70% 64%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 55%;
+    --accent: 240 4% 16%;
+    --accent-foreground: 0 0% 95%;
+    --primary: 263 70% 64%;
+    --primary-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family:
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden; /* Electron window handles scroll */
+  }
+
+  /* Thin custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground;
+  }
+}
+
+/* ── Custom animations ──────────────────────────────────────────────────────── */
+
+/* Task completion: flash primary color, scale up, then shrink + fade */
+@keyframes task-complete {
+  0%   { transform: scale(1);    opacity: 1;   background-color: transparent; }
+  20%  { transform: scale(1.02); opacity: 1;   background-color: hsl(var(--primary) / 0.15); }
+  60%  { transform: scale(0.97); opacity: 0.6; background-color: hsl(var(--primary) / 0.08); }
+  100% { transform: scale(0.95); opacity: 0;   background-color: transparent; }
+}
+
+.animate-task-complete {
+  animation: task-complete 0.55s ease-in-out forwards;
+}
+
+/* XP float: drifts upward and fades out */
+@keyframes xp-float {
+  0%   { transform: translateY(0);    opacity: 1; }
+  100% { transform: translateY(-28px); opacity: 0; }
+}
+
+.animate-xp-float {
+  animation: xp-float 1.6s ease-out forwards;
+}

@@ -1,0 +1,54 @@
+import type { GamificationStats } from '@shared/types'
+
+interface XpBarProps {
+  stats: GamificationStats & { xpGained: number }
+}
+
+// XP needed within the current level (always 100 per level in this formula)
+const XP_PER_LEVEL = 100
+
+export function XpBar({ stats }: XpBarProps) {
+  const { totalXp, level, todayPomodoros, xpGained } = stats
+
+  // How far through the current level (0–99)
+  const xpInLevel = totalXp % XP_PER_LEVEL
+  const fillPct = (xpInLevel / XP_PER_LEVEL) * 100
+
+  return (
+    <div className="relative px-3 py-2.5">
+      {/* Level + XP row */}
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[11px] font-bold text-primary tracking-wide">Lv. {level}</span>
+        <span className="text-[10px] text-muted-foreground font-mono">
+          {xpInLevel} / {XP_PER_LEVEL} XP
+        </span>
+      </div>
+
+      {/* XP progress bar */}
+      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+        <div
+          className="h-full bg-primary rounded-full transition-all duration-700 ease-out"
+          style={{ width: `${fillPct}%` }}
+        />
+      </div>
+
+      {/* Pomodoro today counter */}
+      <div className="flex items-center gap-1 mt-2">
+        <span className="text-sm leading-none">🍅</span>
+        <span className="text-[10px] text-muted-foreground">
+          {todayPomodoros} focus session{todayPomodoros !== 1 ? 's' : ''} today
+        </span>
+      </div>
+
+      {/* Floating "+XP" animation — appears above bar when xpGained > 0 */}
+      {xpGained > 0 && (
+        <div
+          key={totalXp} // re-mount on each new gain so the animation restarts
+          className="absolute right-3 top-1 text-xs font-bold text-primary animate-xp-float pointer-events-none"
+        >
+          +{xpGained} XP
+        </div>
+      )}
+    </div>
+  )
+}

@@ -1,0 +1,94 @@
+import { useEffect, useRef, useState } from 'react'
+import { useAppStore } from '@renderer/store/appStore'
+import type { CreateTaskPayload, CategoryWithCount } from '@shared/types'
+import { Zap, X } from 'lucide-react'
+
+interface BrainDumpInputProps {
+  categories: CategoryWithCount[]
+  onAdd: (payload: CreateTaskPayload) => Promise<void>
+}
+
+export function BrainDumpInput({ categories, onAdd }: BrainDumpInputProps) {
+  const { brainDumpOpen, closeBrainDump, toggleBrainDump, activeCategoryId } = useAppStore()
+  const [value, setValue] = useState('')
+  const [adding, setAdding] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // Ctrl+Space global shortcut
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.code === 'Space') {
+        e.preventDefault()
+        toggleBrainDump()
+      }
+      if (e.key === 'Escape' && brainDumpOpen) {
+        closeBrainDump()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [brainDumpOpen, toggleBrainDump, closeBrainDump])
+
+  // Focus input when opened
+  useEffect(() => {
+    if (brainDumpOpen) {
+      setTimeout(() => inputRef.current?.focus(), 50)
+    }
+  }, [brainDumpOpen])
+
+  const handleAdd = async () => {
+    const title = value.trim()
+    if (!title || adding) return
+
+    // Default to active category, fallback to first category (Inbox)
+    const categoryId = activeCategoryId ?? categories[0]?.id ?? null
+
+    setAdding(true)
+    try {
+      await onAdd({
+        title,
+        categoryId,
+        color: null,
+        dueDate: null,
+        dueBefore5pm: false,
+        timeEstimateMins: null,
+        sortOrder: 0,
+        isComplete: false,
+        recurringPattern: 'none',
+        recurringBaseId: null
+      })
+      setValue('') // stay open for rapid-fire entries
+      inputRef.current?.focus()
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  if (!brainDumpOpen) return null
+
+  return (
+    <div className="flex-shrink-0 border-b border-border bg-card/80 px-4 py-3 flex items-center gap-3">
+      <Zap className="h-4 w-4 text-primary flex-shrink-0" />
+      <input
+        ref={inputRef}
+        type="text"
+        placeholder="Brain dump — type a task and hit Enter. Escape to close."
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') handleAdd()
+        }}
+        className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+      />
+      {adding && (
+        <span className="text-xs text-muted-foreground">Adding…</span>
+      )}
+      <button
+        onClick={closeBrainDump}
+        className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <X className="h-4 w-4" />
+      </button>
+    </div>
+  )
+}

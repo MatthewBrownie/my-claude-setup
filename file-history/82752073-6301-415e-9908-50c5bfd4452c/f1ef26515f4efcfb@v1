@@ -1,0 +1,13 @@
+BUGS:
+- Dragging the to-do list items around causes other items to move inexplicably
+- Minimize button beside brain dump just closes the application
+
+ADDITIONS:
+- Priority on to-do items (1 - Not important, 10 - Critical)
+- Sort the to-do items by: 
+    - category (can be dragged around within their category)
+    - priority (can be dragged around within their priority)
+    - unsorted (can be dragged around anywhere in the list)
+
+CHANGES:
+- Make DO BEFORE 5PM banner slightly less ugly

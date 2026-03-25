@@ -1,0 +1,43 @@
+// All IPC channel name constants. Import in both main handlers and renderer wrappers
+// to avoid string typos — the type system will catch mismatches.
+
+export const IPC = {
+  TASKS: {
+    GET_ALL: 'tasks:get-all',
+    GET_BY_ID: 'tasks:get-by-id',
+    CREATE: 'tasks:create',
+    UPDATE: 'tasks:update',
+    DELETE: 'tasks:delete',
+    REORDER: 'tasks:reorder',
+    COMPLETE: 'tasks:complete'
+  },
+  CATEGORIES: {
+    GET_ALL: 'categories:get-all',
+    CREATE: 'categories:create',
+    UPDATE: 'categories:update',
+    DELETE: 'categories:delete'
+  },
+  SUBTASKS: {
+    GET_BY_TASK: 'subtasks:get-by-task',
+    CREATE: 'subtasks:create',
+    UPDATE: 'subtasks:update',
+    DELETE: 'subtasks:delete',
+    REORDER: 'subtasks:reorder'
+  },
+  POMODORO: {
+    START_SESSION: 'pomodoro:start-session',
+    COMPLETE_SESSION: 'pomodoro:complete-session'
+  },
+  APP: {
+    MINIMIZE_TO_TRAY: 'app:minimize-to-tray',
+    QUIT: 'app:quit'
+  },
+  GAMIFICATION: {
+    GET_STATS: 'gamification:get-stats'
+  },
+  WORK_TIMER: {
+    START: 'work-timer:start',
+    STOP: 'work-timer:stop',
+    GET_TODAY_TOTAL: 'work-timer:get-today-total'
+  }
+} as const

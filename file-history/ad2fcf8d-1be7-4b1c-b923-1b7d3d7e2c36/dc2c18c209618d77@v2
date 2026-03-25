@@ -1,0 +1,32 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Overview
+
+This is the `~/.claude` user configuration directory for Claude Code — not a software project. It contains Claude Code's own settings, plugin data, conversation history, and memory.
+
+## Directory Structure
+
+- `settings.json` — Global Claude Code settings (auto-update channel, permissions, hooks, MCP servers, etc.)
+- `plugins/` — Plugin marketplace data and installed plugins (`marketplaces/claude-plugins-official/`)
+- `projects/` — Per-project conversation history (one subdirectory per project path)
+- `projects/C--Users-mbrow--claude/memory/` — Persistent memory files for this directory's sessions
+- `sessions/` — Active session state
+- `history.jsonl` — CLI command history
+- `cache/` — Cached data including changelog
+- `backups/` — Automatic backups of settings
+- `shell-snapshots/` — Shell environment snapshots
+
+## Key Files
+
+- `settings.json` — Edit this to configure permissions, hooks, MCP servers, environment variables. Use the `update-config` skill for guided edits.
+- `projects/C--Users-mbrow--claude/memory/` — Persistent memory storage. Files here use frontmatter with `name`, `description`, and `type` fields. An index lives at `MEMORY.md` in this same directory.
+
+## Plugin Structure
+
+Plugins live under `plugins/marketplaces/claude-plugins-official/plugins/<plugin-name>/` and follow this layout:
+- `README.md` — Plugin description
+- `commands/` — Slash commands (`.md` files)
+- `skills/` — Skills invocable by Claude (each with a `SKILL.md` and optional `references/`)
+- `agents/` — Subagent definitions

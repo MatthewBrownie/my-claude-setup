@@ -1,0 +1,232 @@
+import { useState } from 'react'
+import type { Task, CategoryWithCount, CreateTaskPayload, UpdateTaskPayload, RecurringPattern } from '@shared/types'
+
+const COLORS = [
+  { label: 'Default', value: null },
+  { label: 'Red', value: '#ef4444' },
+  { label: 'Orange', value: '#f97316' },
+  { label: 'Yellow', value: '#eab308' },
+  { label: 'Green', value: '#22c55e' },
+  { label: 'Blue', value: '#3b82f6' },
+  { label: 'Purple', value: '#8b5cf6' },
+  { label: 'Pink', value: '#ec4899' }
+]
+
+interface TaskFormProps {
+  initial?: Task
+  categories: CategoryWithCount[]
+  defaultCategoryId?: number | null
+  onSave: (payload: CreateTaskPayload | UpdateTaskPayload) => Promise<void>
+  onClose: () => void
+}
+
+export function TaskForm({ initial, categories, defaultCategoryId, onSave, onClose }: TaskFormProps) {
+  const [title, setTitle] = useState(initial?.title ?? '')
+  const [categoryId, setCategoryId] = useState<number | null>(
+    initial?.categoryId ?? defaultCategoryId ?? (categories[0]?.id ?? null)
+  )
+  const [color, setColor] = useState<string | null>(initial?.color ?? null)
+  const [dueDate, setDueDate] = useState(initial?.dueDate ?? '')
+  const [dueBefore5pm, setDueBefore5pm] = useState(initial?.dueBefore5pm ?? false)
+  const [timeEstimateMins, setTimeEstimateMins] = useState<string>(
+    initial?.timeEstimateMins != null ? String(initial.timeEstimateMins) : ''
+  )
+  const [description, setDescription] = useState(initial?.description ?? '')
+  const [recurringPattern, setRecurringPattern] = useState<RecurringPattern>(
+    initial?.recurringPattern ?? 'none'
+  )
+  const [priority, setPriority] = useState<number>(initial?.priority ?? 5)
+  const [saving, setSaving] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!title.trim()) return
+    setSaving(true)
+    try {
+      const base = {
+        categoryId,
+        title: title.trim(),
+        description: description.trim() || null,
+        color,
+        dueDate: dueDate || null,
+        dueBefore5pm,
+        timeEstimateMins: timeEstimateMins ? parseInt(timeEstimateMins, 10) : null,
+        recurringPattern,
+        recurringBaseId: initial?.recurringBaseId ?? null,
+        xpValue: initial?.xpValue ?? 10,
+        priority
+      }
+
+      if (initial) {
+        await onSave({ id: initial.id, ...base, isComplete: initial.isComplete })
+      } else {
+        await onSave({ ...base, isComplete: false, sortOrder: 0 })
+      }
+      onClose()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
+      <form
+        onSubmit={handleSubmit}
+        className="bg-card border border-border rounded-lg p-5 w-[480px] shadow-xl space-y-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="font-semibold text-foreground">{initial ? 'Edit Task' : 'New Task'}</h2>
+
+        {/* Title */}
+        <input
+          autoFocus
+          type="text"
+          placeholder="What needs to be done?"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="w-full bg-input border border-border rounded px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        />
+
+        {/* Description */}
+        <textarea
+          placeholder="Add a description… (optional)"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={2}
+          className="w-full bg-input border border-border rounded px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+        />
+
+        <div className="grid grid-cols-2 gap-3">
+          {/* Category */}
+          <div>
+            <label className="block text-xs text-muted-foreground mb-1">Category</label>
+            <select
+              value={categoryId ?? ''}
+              onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : null)}
+              className="w-full bg-input border border-border rounded px-2 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            >
+              <option value="">None</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Time estimate */}
+          <div>
+            <label className="block text-xs text-muted-foreground mb-1">Time estimate (min)</label>
+            <input
+              type="number"
+              min={1}
+              placeholder="e.g. 30"
+              value={timeEstimateMins}
+              onChange={(e) => setTimeEstimateMins(e.target.value)}
+              className="w-full bg-input border border-border rounded px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+          </div>
+
+          {/* Due date */}
+          <div>
+            <label className="block text-xs text-muted-foreground mb-1">Due date</label>
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="w-full bg-input border border-border rounded px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring [color-scheme:dark]"
+            />
+          </div>
+
+          {/* Recurring */}
+          <div>
+            <label className="block text-xs text-muted-foreground mb-1">Repeats</label>
+            <select
+              value={recurringPattern}
+              onChange={(e) => setRecurringPattern(e.target.value as RecurringPattern)}
+              className="w-full bg-input border border-border rounded px-2 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            >
+              <option value="none">Never</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </div>
+
+          {/* Priority */}
+          <div className="col-span-2">
+            <label className="block text-xs text-muted-foreground mb-1">Priority</label>
+            <select
+              value={priority}
+              onChange={(e) => setPriority(Number(e.target.value))}
+              className="w-full bg-input border border-border rounded px-2 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            >
+              <optgroup label="Low">
+                <option value={1}>1 — Not important</option>
+                <option value={2}>2</option>
+                <option value={3}>3</option>
+              </optgroup>
+              <optgroup label="Medium">
+                <option value={4}>4</option>
+                <option value={5}>5 — Default</option>
+                <option value={6}>6</option>
+              </optgroup>
+              <optgroup label="High">
+                <option value={7}>7</option>
+                <option value={8}>8</option>
+                <option value={9}>9</option>
+                <option value={10}>10 — Critical</option>
+              </optgroup>
+            </select>
+          </div>
+        </div>
+
+        {/* Due before 5pm */}
+        <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+          <input
+            type="checkbox"
+            checked={dueBefore5pm}
+            onChange={(e) => setDueBefore5pm(e.target.checked)}
+            className="accent-primary"
+          />
+          Mark as "Do Before 5 PM"
+        </label>
+
+        {/* Color picker */}
+        <div>
+          <p className="text-xs text-muted-foreground mb-2">Task color</p>
+          <div className="flex gap-2 flex-wrap">
+            {COLORS.map(({ label, value }) => (
+              <button
+                key={label}
+                type="button"
+                title={label}
+                onClick={() => setColor(value)}
+                className="w-5 h-5 rounded-full border-2 transition-transform hover:scale-110"
+                style={{
+                  backgroundColor: value ?? '#374151',
+                  borderColor: color === value ? 'white' : 'transparent'
+                }}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="flex gap-2 justify-end pt-1">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving || !title.trim()}
+            className="px-4 py-1.5 text-sm bg-primary text-primary-foreground rounded hover:opacity-90 disabled:opacity-50 transition-opacity"
+          >
+            {saving ? 'Saving…' : initial ? 'Save changes' : 'Add task'}
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}

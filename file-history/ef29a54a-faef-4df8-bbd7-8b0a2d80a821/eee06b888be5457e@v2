@@ -1,0 +1,20 @@
+import type Database from 'better-sqlite3'
+import type { PomodoroSession } from '@shared/types'
+
+export function startSession(
+  db: Database.Database,
+  payload: { taskId?: number; phase: PomodoroSession['phase']; durationS: number }
+): { sessionId: number } {
+  const result = db
+    .prepare('INSERT INTO pomodoro_sessions (task_id, phase, duration_s) VALUES (?, ?, ?)')
+    .run(payload.taskId ?? null, payload.phase, payload.durationS)
+  return { sessionId: result.lastInsertRowid as number }
+}
+
+export function completeSession(db: Database.Database, sessionId: number): void {
+  db.prepare(
+    `UPDATE pomodoro_sessions
+     SET was_completed = 1, completed_at = datetime('now')
+     WHERE id = ?`
+  ).run(sessionId)
+}

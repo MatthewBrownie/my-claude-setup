@@ -1,0 +1,21 @@
+import { ipcMain } from 'electron'
+import { IPC } from '@shared/ipc-channels'
+import type { CreateSubtaskPayload, UpdateSubtaskPayload } from '@shared/types'
+import { getDb } from '../db'
+import * as db from '../db/subtasks'
+
+export function registerSubtaskHandlers(): void {
+  ipcMain.handle(IPC.SUBTASKS.GET_BY_TASK, (_e, { taskId }) =>
+    db.getSubtasksByTask(getDb(), taskId)
+  )
+  ipcMain.handle(IPC.SUBTASKS.CREATE, (_e, payload: CreateSubtaskPayload) =>
+    db.createSubtask(getDb(), payload)
+  )
+  ipcMain.handle(IPC.SUBTASKS.UPDATE, (_e, payload: UpdateSubtaskPayload) =>
+    db.updateSubtask(getDb(), payload)
+  )
+  ipcMain.handle(IPC.SUBTASKS.DELETE, (_e, { id }) => db.deleteSubtask(getDb(), id))
+  ipcMain.handle(IPC.SUBTASKS.REORDER, (_e, { taskId, orderedIds }) =>
+    db.reorderSubtasks(getDb(), orderedIds)
+  )
+}

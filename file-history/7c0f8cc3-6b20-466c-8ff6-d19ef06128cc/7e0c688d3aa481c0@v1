@@ -1,0 +1,72 @@
+import { useAppStore } from '@renderer/store/appStore'
+import { PomodoroTimer } from './PomodoroTimer'
+import type { Task, CategoryWithCount } from '@shared/types'
+import { X, Clock } from 'lucide-react'
+import { formatMinutes } from '@renderer/lib/utils'
+
+interface FocusModeProps {
+  tasks: Task[]
+  categories: CategoryWithCount[]
+}
+
+export function FocusMode({ tasks, categories }: FocusModeProps) {
+  const { focusMode, focusTaskId, exitFocusMode } = useAppStore()
+
+  if (!focusMode) return null
+
+  const task = tasks.find((t) => t.id === focusTaskId)
+  const category = task ? categories.find((c) => c.id === task.categoryId) : undefined
+
+  return (
+    <div className="fixed inset-0 z-50 bg-background flex flex-col">
+      {/* Top bar */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          Focus Mode
+        </p>
+        <button
+          onClick={exitFocusMode}
+          className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          title="Exit focus mode"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      {/* Task display */}
+      <div className="flex-1 flex flex-col items-center justify-center gap-8 px-8">
+        {task ? (
+          <div className="text-center max-w-xl">
+            {category && (
+              <div className="flex items-center justify-center gap-1.5 mb-3">
+                <span
+                  className="w-2 h-2 rounded-full"
+                  style={{ backgroundColor: category.color }}
+                />
+                <span className="text-xs text-muted-foreground">{category.name}</span>
+              </div>
+            )}
+            <h1 className="text-3xl font-bold text-foreground leading-tight">{task.title}</h1>
+            {task.timeEstimateMins != null && (
+              <p className="flex items-center justify-center gap-1.5 mt-3 text-sm text-muted-foreground">
+                <Clock className="h-4 w-4" />
+                Estimated {formatMinutes(task.timeEstimateMins)}
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="text-muted-foreground text-lg">No task selected.</p>
+        )}
+
+        {/* Pomodoro timer */}
+        <div className="bg-card border border-border rounded-xl px-12 py-2">
+          <PomodoroTimer taskId={task?.id} />
+        </div>
+      </div>
+
+      <p className="text-center text-xs text-muted-foreground pb-4">
+        Press Escape or click ✕ to exit focus mode
+      </p>
+    </div>
+  )
+}

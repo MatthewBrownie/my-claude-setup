@@ -1,0 +1,73 @@
+import { useState } from 'react'
+import type { CategoryWithCount, CreateCategoryPayload, UpdateCategoryPayload } from '@shared/types'
+import { CategoryForm } from './CategoryForm'
+import { Pencil, Trash2 } from 'lucide-react'
+import { cn } from '@renderer/lib/utils'
+
+interface CategoryItemProps {
+  category: CategoryWithCount
+  isActive: boolean
+  onSelect: () => void
+  onEdit: (payload: UpdateCategoryPayload) => Promise<void>
+  onDelete: (id: number) => Promise<void>
+}
+
+export function CategoryItem({ category, isActive, onSelect, onEdit, onDelete }: CategoryItemProps) {
+  const [showForm, setShowForm] = useState(false)
+  const [hovered, setHovered] = useState(false)
+
+  return (
+    <>
+      <div
+        className={cn(
+          'group flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors',
+          isActive ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+        )}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        onClick={onSelect}
+      >
+        {/* Category color dot */}
+        <span
+          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+          style={{ backgroundColor: category.color }}
+        />
+
+        <span className="flex-1 text-sm truncate">{category.name}</span>
+
+        {/* Task count badge */}
+        {category.taskCount > 0 && (
+          <span className="text-xs bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 font-mono">
+            {category.taskCount}
+          </span>
+        )}
+
+        {/* Action buttons — only shown on hover */}
+        {hovered && (
+          <div className="flex gap-0.5 ml-1" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setShowForm(true)}
+              className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Pencil className="h-3 w-3" />
+            </button>
+            <button
+              onClick={() => onDelete(category.id)}
+              className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-destructive transition-colors"
+            >
+              <Trash2 className="h-3 w-3" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {showForm && (
+        <CategoryForm
+          initial={category}
+          onSave={onEdit}
+          onClose={() => setShowForm(false)}
+        />
+      )}
+    </>
+  )
+}

@@ -1,0 +1,54 @@
+digraph enrichment_pipeline {
+    rankdir=TB;
+    bgcolor="#0f1729";
+    fontname="Helvetica";
+    node [fontname="Helvetica", fontcolor="white", style="rounded,filled", margin="0.2,0.1"];
+    edge [fontcolor="white", color="white", fontname="Helvetica", fontsize=10];
+
+    // HTTP trigger
+    HTTP [label="POST /enrichments/trigger\n{ sourceId }", shape=box, fillcolor="#374151"];
+
+    // Orchestrator
+    ORCH [label="Enrichment Orchestrator", shape=box, fillcolor="#1a56db", width=2.5];
+
+    // Side nodes
+    TCL [label="Text Chunks Library", shape=box, fillcolor="#0f766e"];
+    REG [label="Registry", shape=box, fillcolor="#b45309"];
+
+    // Handlers
+    subgraph cluster_TEH {
+        label="Temporal Enrichment Handler";
+        fontcolor="white";
+        color="#166534";
+        bgcolor="#166534";
+        style="rounded,filled";
+        TQS [label="Queue Service\n(BullMQ)", shape=box, fillcolor="#14532d"];
+        TEX [label="Temporal Extractor", shape=box, fillcolor="#14532d"];
+        TQS -> TEX [color="#86efac"];
+    }
+
+    subgraph cluster_REH {
+        label="Requirement Enrichment Handler";
+        fontcolor="white";
+        color="#166534";
+        bgcolor="#166534";
+        style="rounded,filled";
+        RQS [label="Queue Service\n(BullMQ)", shape=box, fillcolor="#14532d"];
+        REX [label="Requirement Extractor", shape=box, fillcolor="#14532d"];
+        RQS -> REX [color="#86efac"];
+    }
+
+    // Neo4j
+    NEO [label="Neo4j", shape=cylinder, fillcolor="#6d28d9"];
+
+    // Edges
+    HTTP -> ORCH;
+    ORCH -> TCL [label="fetch chunks"];
+    ORCH -> REG [label="get active handlers"];
+    ORCH -> TQS [label="«interface»\nenrich(sourceId)"];
+    ORCH -> RQS [label="«interface»\nenrich(sourceId)"];
+    TQS -> ORCH [label="EnrichmentResult", style=dashed, color="#93c5fd"];
+    RQS -> ORCH [label="EnrichmentResult", style=dashed, color="#93c5fd"];
+    TEX -> NEO [label="persists\n(open question)", style=dashed, color="#c4b5fd"];
+    REX -> NEO [label="persists\n(open question)", style=dashed, color="#c4b5fd"];
+}

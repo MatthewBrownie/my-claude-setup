@@ -1,0 +1,48 @@
+# Plan: Project-Local Database Query Skills
+
+## Context
+Create two Claude Code skills local to the `gpsl-cp-system` project so that `/neo4j-query` and `/postgres-query` invoke query-helper prompts pre-loaded with the actual schema of this codebase — making query assistance far more precise than a generic helper.
+
+## Files to Create
+
+- `C:\Users\mbrow\git\gpsl-cp-system\.claude\skills\neo4j-query.md`
+- `C:\Users\mbrow\git\gpsl-cp-system\.claude\skills\postgres-query.md`
+
+## What Each Skill Contains
+
+### neo4j-query.md
+- Role: you are a Cypher query expert for this specific graph
+- Full node schema:
+  - Document (sourceId, name, createdAt)
+  - Text (sourceId, guid, pageNumber, paragraphNumber, text, nodeType, nodePath)
+  - Collection (sourceId, name, createdAt)
+  - GlossaryTerm (name, wordnv, acronym, posnv, tag, meaning, category, taxonomy_l1/l2/l3, id)
+  - Terminology (sourceId, name)
+  - Acronym (name, acronym, meaning, id)
+  - Date, Requirement, Temporal (referenced, limited detail)
+- Full relationship schema:
+  - (Collection)-[:HAS_DOCUMENT]->(Document)
+  - (Document)-[:HAS_TEXT]->(Text)
+  - (Collection)-[:USES]->(Terminology)
+  - (Text)-[:CONTAINS]->(GlossaryTerm)
+  - (GlossaryTerm)-[:HAS_ACRONYM]->(Acronym)
+  - (GlossaryTerm)-[:IS_PART_OF]->(Terminology)
+  - (Acronym)-[:IS_PART_OF]->(Terminology)
+- Key indexes (sourceId, guid, id are unique)
+- Stack context: NestJS + neo4j-driver + nest-neo4j, queries live in `*.queries.ts` files
+- Instructions: ask for missing context, suggest EXPLAIN/PROFILE when relevant, warn about full graph scans, prefer parameterized queries
+
+### postgres-query.md
+- Role: you are a PostgreSQL query expert for this specific schema
+- Full table schema (all 10 tables with column names, types, constraints, indexes)
+- FK relationships between tables
+- Notable: text_chunks uses pgvector (vector(1536)) for embeddings
+- Stack context: TypeORM + NestJS, entities in `discovery-database/src/entities/`, migrations in `discovery-database/src/migrations/`
+- Instructions: ask for missing context, suggest EXPLAIN ANALYZE when relevant, warn about missing index usage, prefer parameterized queries, note TypeORM QueryBuilder vs raw SQL tradeoffs
+
+## Invocation
+User types `/neo4j-query` or `/postgres-query` to load the skill into the session.
+
+## Verification
+- Confirm `.claude/skills/` directory structure is correct
+- Invoke each skill after creation and verify schema context is present in the response

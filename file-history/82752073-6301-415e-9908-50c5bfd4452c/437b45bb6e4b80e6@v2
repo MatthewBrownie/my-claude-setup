@@ -1,0 +1,63 @@
+import { useState, useCallback } from 'react'
+import type { Task, CreateTaskPayload, UpdateTaskPayload, CompleteTaskResult } from '@shared/types'
+import * as ipc from '@renderer/lib/ipc'
+import { arrayMove } from '@dnd-kit/sortable'
+
+export function useTasks(opts?: { categoryId?: number; includeComplete?: boolean }) {
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [loading, setLoading] = useState(false)
+
+  const refresh = useCallback(async () => {
+    setLoading(true)
+    try {
+      setTasks(await ipc.getAllTasks(opts))
+    } finally {
+      setLoading(false)
+    }
+  }, [opts?.categoryId, opts?.includeComplete])
+
+  const addTask = useCallback(async (payload: CreateTaskPayload) => {
+    const newTask = await ipc.createTask(payload)
+    setTasks((prev) => [...prev, newTask])
+    return newTask
+  }, [])
+
+  const editTask = useCallback(async (payload: UpdateTaskPayload) => {
+    const updated = await ipc.updateTask(payload)
+    setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)))
+    return updated
+  }, [])
+
+  const removeTask = useCallback(async (id: number) => {
+    await ipc.deleteTask(id)
+    setTasks((prev) => prev.filter((t) => t.id !== id))
+  }, [])
+
+  /**
+   * Optimistically reorder tasks by dragging.
+   * oldIndex/newIndex are positions within the active (incomplete) subset only —
+   * done tasks are excluded from sorting and kept at the end of the state array.
+   */
+  const reorder = useCallback(
+    async (oldIndex: number, newIndex: number) => {
+      const active = tasks.filter((t) => !t.isComplete)
+      const done = tasks.filter((t) => t.isComplete)
+      const reorderedActive = arrayMove(active, oldIndex, newIndex)
+      setTasks([...reorderedActive, ...done]) // optimistic update
+      try {
+        await ipc.reorderTasks(reorderedActive.map((t) => t.id))
+      } catch {
+        setTasks(tasks)
+      }
+    },
+    [tasks]
+  )
+
+  const markComplete = useCallback(async (id: number): Promise<CompleteTaskResult> => {
+    const result = await ipc.completeTask(id)
+    setTasks((prev) => prev.filter((t) => t.id !== id))
+    return result
+  }, [])
+
+  return { tasks, loading, refresh, addTask, editTask, removeTask, reorder, markComplete }
+}

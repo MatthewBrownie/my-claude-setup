@@ -1,0 +1,50 @@
+import type Database from 'better-sqlite3'
+import { format } from 'date-fns'
+
+/** Start a new work session and return its id and start time. */
+export function startSession(db: Database.Database): { id: number; startedAt: string } {
+  const now = new Date()
+  const startedAt = now.toISOString()
+  const date = format(now, 'yyyy-MM-dd')
+
+  const result = db
+    .prepare('INSERT INTO work_sessions (date, started_at) VALUES (?, ?)')
+    .run(date, startedAt)
+
+  return { id: result.lastInsertRowid as number, startedAt }
+}
+
+/** Close an open session by recording its end time. */
+export function endSession(db: Database.Database, id: number): void {
+  db.prepare(`UPDATE work_sessions SET ended_at = datetime('now') WHERE id = ?`).run(id)
+}
+
+/**
+ * Return total seconds worked today (completed sessions + any currently active session).
+ * Completed = sessions where ended_at IS NOT NULL.
+ * Active = session where ended_at IS NULL (at most one at a time).
+ */
+export function getTodayTotal(db: Database.Database): number {
+  const today = format(new Date(), 'yyyy-MM-dd')
+
+  // Sum of all completed sessions today
+  const row = db
+    .prepare(
+      `SELECT COALESCE(SUM(CAST((julianday(ended_at) - julianday(started_at)) * 86400 AS INTEGER)), 0) AS total
+       FROM work_sessions
+       WHERE date = ? AND ended_at IS NOT NULL`
+    )
+    .get(today) as { total: number }
+
+  // Add any active session elapsed so far
+  const active = db
+    .prepare(`SELECT started_at FROM work_sessions WHERE date = ? AND ended_at IS NULL LIMIT 1`)
+    .get(today) as { started_at: string } | undefined
+
+  let activeSeconds = 0
+  if (active) {
+    activeSeconds = Math.floor((Date.now() - new Date(active.started_at).getTime()) / 1000)
+  }
+
+  return row.total + activeSeconds
+}

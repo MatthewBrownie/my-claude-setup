@@ -1,0 +1,34 @@
+import { useLiveClock } from '@renderer/hooks/useLiveClock'
+import { format } from 'date-fns'
+import { cn } from '@renderer/lib/utils'
+
+interface LiveClockProps {
+  className?: string
+}
+
+export function LiveClock({ className }: LiveClockProps) {
+  const now = useLiveClock()
+
+  // Split into hours:minutes and seconds so seconds can be styled differently
+  const hhmm = format(now, 'hh:mm')
+  const ss = format(now, 'ss')
+  const ampm = format(now, 'aa')
+  const dayStr = format(now, 'EEEE, MMMM d')
+
+  return (
+    <div className={cn('select-none', className)}>
+      <div className="flex items-end gap-1 leading-none">
+        <span className="font-mono text-5xl font-bold tracking-tight text-foreground">
+          {hhmm}
+        </span>
+        <span className="font-mono text-2xl font-semibold text-muted-foreground mb-1">
+          :{ss}
+        </span>
+        <span className="font-mono text-lg font-medium text-muted-foreground mb-1 ml-1">
+          {ampm}
+        </span>
+      </div>
+      <p className="text-xs text-muted-foreground mt-0.5 tracking-wide">{dayStr}</p>
+    </div>
+  )
+}
